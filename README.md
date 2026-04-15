@@ -3,9 +3,9 @@
 **Convert scikit-learn models to native embedded code — C, C++, Arduino, MicroPython**
 
 [![Tests](https://github.com/AxelSkrauba/BlackBox2C/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelSkrauba/BlackBox2C/actions)
+[![PyPI](https://img.shields.io/pypi/v/blackbox2c)](https://pypi.org/project/blackbox2c/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
 
 BlackBox2C converts any trained scikit-learn model into a minimal if-else decision tree in your
 target language. The generated code has **zero runtime dependencies**, runs on any microcontroller
