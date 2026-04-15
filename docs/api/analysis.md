@@ -61,8 +61,9 @@ results.get_redundant_features(threshold=0.001)
 ### Plotting
 
 ```python
-results.plot(top_n=10)
-# Displays a horizontal bar chart of importances (requires matplotlib)
+fig, ax = results.plot(figsize=(10, 6), save_path=None)
+# Returns (fig, ax). Requires matplotlib.
+# Displays a horizontal bar chart with permutation importances and error bars.
 ```
 
 ---

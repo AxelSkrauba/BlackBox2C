@@ -26,7 +26,6 @@
 - [ ] **More export formats**: Rust, MicroC
 - [ ] **Quantization-aware training integration**
 - [ ] **SIMD / vectorization hints** for Cortex-M4/M7
-- [ ] **pypi package** (public release)
 
 ---
 

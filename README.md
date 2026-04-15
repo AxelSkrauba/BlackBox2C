@@ -39,14 +39,25 @@ with a C compiler, and fits in a few hundred bytes of FLASH.
 ## Installation
 
 ```bash
-# From source (development)
-pip install -e .
-
-# With dev dependencies (pytest, mkdocs, etc.)
-pip install -e ".[dev]"
+pip install blackbox2c
 ```
 
 Requirements: Python 3.8+, NumPy >= 1.21, scikit-learn >= 1.0.
+
+> **Tip:** Use a virtual environment to keep your project isolated:
+> ```bash
+> python -m venv .venv && source .venv/bin/activate  # Linux/macOS
+> python -m venv .venv && .venv\Scripts\activate     # Windows
+> pip install blackbox2c
+> ```
+
+For development (from source):
+
+```bash
+git clone https://github.com/AxelSkrauba/BlackBox2C.git
+cd BlackBox2C
+pip install -e ".[dev]"
+```
 
 ---
 
@@ -105,7 +116,7 @@ uint8_t predict(float features[4]) {
 ### Export to Other Formats
 
 ```python
-# Arduino .h file
+# Arduino .ino file
 arduino_code = convert(model, iris.data, target='arduino')
 
 # C++ class
@@ -220,8 +231,9 @@ blackbox2c/
 │   ├── analysis.py      # Feature sensitivity analysis
 │   └── cli.py           # Command-line interface
 ├── tests/               # 167 tests, >91% coverage
+├── notebooks/           # Jupyter notebook examples (runnable on Colab)
 ├── benchmarks/          # Classic dataset benchmarks
-├── examples/            # End-to-end usage examples
+├── examples/            # Script-based end-to-end examples
 └── docs/                # MkDocs documentation source
 ```
 

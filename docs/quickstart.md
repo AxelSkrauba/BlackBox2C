@@ -3,14 +3,27 @@
 ## Installation
 
 ```bash
-# Development install (recommended)
-pip install -e .
-
-# With dev tools (pytest, mkdocs, etc.)
-pip install -e ".[dev]"
+pip install blackbox2c
 ```
 
 Requirements: Python 3.8+, NumPy >= 1.21, scikit-learn >= 1.0.
+
+**Recommended:** use a virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate      # Linux / macOS
+.venv\Scripts\activate          # Windows
+pip install blackbox2c
+```
+
+For contributors (development install from source):
+
+```bash
+git clone https://github.com/AxelSkrauba/BlackBox2C.git
+cd BlackBox2C
+pip install -e ".[dev]"
+```
 
 ---
 

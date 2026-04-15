@@ -1,6 +1,23 @@
 # Examples
 
-All examples are in the [`examples/`](https://github.com/AxelSkrauba/BlackBox2C/tree/main/examples) directory.
+## Interactive Notebooks
+
+For hands-on, fully-executed examples with rendered outputs, see the [Notebooks](notebooks/01_quickstart.ipynb) section:
+
+| Notebook | Description |
+|---|---|
+| [Quickstart](notebooks/01_quickstart.ipynb) | Convert a model to C in 5 minutes |
+| [Classification](notebooks/02_classification_iris.ipynb) | DT / RF / SVM / MLP comparison |
+| [Regression IoT](notebooks/03_regression_temperature.ipynb) | Fixed-point, depth trade-offs |
+| [Feature Analysis](notebooks/04_feature_analysis.ipynb) | Sensor reduction, BOM impact |
+| [Multi-Format Export](notebooks/05_multi_format_export.ipynb) | C, C++, Arduino, MicroPython |
+| [End-to-End IoT (ADL)](notebooks/06_end_to_end_iot.ipynb) | Full pipeline on a real gas-sensor dataset |
+
+---
+
+## Script Examples
+
+All script examples are in the [`examples/`](https://github.com/AxelSkrauba/BlackBox2C/tree/main/examples) directory.
 
 ---
 
@@ -66,8 +83,9 @@ with open('predictor.py', 'w') as f:
 
 On device:
 ```python
-from predictor import Predictor
-result = Predictor.predict([0.5, 1.2, 3.1, 0.8])
+from model import Predictor
+pred = Predictor()
+result = pred.predict([0.5, 1.2, 3.1, 0.8])
 ```
 
 ### Feature selection for sensor-constrained systems

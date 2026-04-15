@@ -13,7 +13,7 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `max_depth` | `int` | `5` | Max depth of the surrogate decision tree. Range: 1-10. Higher = more accurate but larger code. |
-| `optimize_rules` | `str` | `'medium'` | Rule optimization level: `'low'` (none), `'medium'` (pruning), `'high'` (pruning + merging). |
+| `optimize_rules` | `str` | `'medium'` | Rule optimization level: `'low'` (light pruning), `'medium'` (pruning), `'high'` (pruning + leaf merging). |
 | `use_fixed_point` | `bool` | `False` | Use integer arithmetic instead of float. Useful for MCUs without FPU. |
 | `precision` | `int` | `8` | Bit width for fixed-point scaling: `8`, `16`, or `32`. Ignored if `use_fixed_point=False`. |
 | `function_name` | `str` | `'predict'` | Name of the generated C/C++ function. |

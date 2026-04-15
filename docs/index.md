@@ -42,21 +42,23 @@ iris = load_iris()
 model = RandomForestClassifier(n_estimators=50, random_state=42)
 model.fit(iris.data, iris.target)
 
-c_code = convert(model, iris.data, target='c', max_depth=5)
+c_code = convert(model, iris.data, max_depth=5)
 print(c_code)
 ```
 
-See [Getting Started](quickstart.md) for the full walkthrough.
+See [Getting Started](quickstart.md) for the full walkthrough, or jump straight into the [interactive notebooks](notebooks/01_quickstart.ipynb).
 
 ---
 
 ## Installation
 
 ```bash
-pip install -e .
+pip install blackbox2c
 ```
 
 Requires Python 3.8+, NumPy >= 1.21, scikit-learn >= 1.0.
+
+> **Tip:** Use a virtual environment: `python -m venv .venv && pip install blackbox2c`
 
 ---
 
