@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Convert ML models to optimized code for embedded systems"
 readme = "README.md"
 requires-python = ">=3.8"
-license-files = ["LICENSE"]
+license = {text = "MIT"}
 authors = [
     {name = "Axel Skrauba"}
 ]
