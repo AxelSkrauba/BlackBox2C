@@ -51,10 +51,19 @@ output/
 
 # MkDocs
 site/
+docs/notebooks/
+.cache/
 
 # Distribution
 .eggs/
 *.dist-info/
+
+# Notebook generated outputs
+depth_tradeoff.png
+feature_importance.png
+adl_eda.png
+adl_confusion_rf.png
+adl_feature_importance.png
 
 # Misc
 *.log

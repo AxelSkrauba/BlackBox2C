@@ -32,9 +32,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install MkDocs
+      - name: Install MkDocs and notebook dependencies
         run: |
-          pip install mkdocs-material
+          pip install mkdocs-material mkdocs-jupyter
+          pip install blackbox2c pandas matplotlib seaborn scikit-learn
 
       - name: Build MkDocs site
         run: |

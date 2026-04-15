@@ -41,6 +41,18 @@ markdown_extensions:
   - toc:
       permalink: true
 
+exclude_docs: |
+  hooks.py
+
+hooks:
+  - docs/hooks.py
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+
 nav:
   - Home: index.md
   - Getting Started: quickstart.md
@@ -53,5 +65,12 @@ nav:
       - FeatureSensitivityAnalyzer: api/analysis.md
       - CLI: api/cli.md
   - Examples: examples.md
+  - Notebooks:
+      - Quickstart (5 min): notebooks/01_quickstart.ipynb
+      - Classification: notebooks/02_classification_iris.ipynb
+      - Regression IoT: notebooks/03_regression_temperature.ipynb
+      - Feature Analysis: notebooks/04_feature_analysis.ipynb
+      - Multi-Format Export: notebooks/05_multi_format_export.ipynb
+      - End-to-End IoT (ADL): notebooks/06_end_to_end_iot.ipynb
   - Comparison: comparison.md
   - Roadmap: roadmap.md
