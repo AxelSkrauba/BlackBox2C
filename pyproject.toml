@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Convert ML models to optimized code for embedded systems"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Axel Skrauba"}
 ]
