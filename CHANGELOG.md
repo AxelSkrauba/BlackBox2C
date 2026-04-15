@@ -5,6 +5,18 @@ All notable changes to BlackBox2C will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned
+- Advanced rule optimization: Quine-McCluskey boolean minimization, BDDs
+- Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)
+- CLI batch conversion from config file
+- More export formats
+- Quantization-aware training integration
+- SIMD / vectorization hints for Cortex-M4/M7
+
+---
+
 ## [0.1.0] - 2026-04-15
 
 ### Fixed
@@ -16,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Promoted from beta (`0.1.0b1`) to stable (`0.1.0`).
 - Development Status classifier updated to `5 - Production/Stable`.
 - Added `[tool.setuptools.packages.find]` section to `pyproject.toml` for explicit package discovery.
+
+### Documentation (post-release)
+- Added 6 Jupyter notebook examples (`notebooks/`) covering quickstart, classification, regression, feature analysis, multi-format export, and a full end-to-end IoT pipeline on the ADL Air Quality dataset.
+- Integrated notebooks into MkDocs docs via `mkdocs-jupyter` plugin with a pre-build hook.
+- Updated installation instructions across all docs: `pip install blackbox2c` as primary, with virtual environment guidance.
+- Fixed `docs/api/analysis.md` `plot()` signature, `optimize_rules` description in `config.md`.
+- Removed stale "PyPI release" item from roadmap (already released).
+
+### Infrastructure (post-release)
+- Added `publish.yml` GitHub Actions workflow: tag-triggered, runs tests → build → PyPI Trusted Publisher → GitHub Release.
+- Configured PyPI Trusted Publisher (OIDC) — no API token stored in secrets.
 
 ---
 
@@ -65,16 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration tests
 - Edge case tests
 
-## [Unreleased]
-
-### Planned
-- Command-line interface (CLI) enhancements
-- Additional optimization algorithms (Quine-McCluskey, BDD)
-- Hardware-specific optimizations (SIMD, vectorization)
-- Quantization-aware training integration
-- Automated benchmarking on real hardware
-
----
-
+[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0
 [0.1.0b1]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0b1
