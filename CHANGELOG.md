@@ -17,6 +17,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2026-04-16
+
+### Fixed
+
+- **`codegen.py` — critical bug: invalid C code generated for C target**
+  (`CCodeGenerator._generate_tree_logic`): feature names were emitted verbatim
+  as C identifiers inside `if`-conditions (e.g. `if (petal length (cm) <= 2.45f)`),
+  producing code that fails to compile whenever feature names contain spaces,
+  parentheses, or other characters that are invalid in C identifiers.
+  The fix always emits `features[<index>]` array indexing, matching the
+  behaviour already present in the `CppExporter`, `ArduinoExporter`, and
+  `MicroPythonExporter`.  This bug affected **all C-target outputs** when
+  `feature_names` with special characters were supplied (e.g. the standard
+  scikit-learn Iris, Wine, Diabetes datasets).
+
+- **`codegen.py` — latent bug: unsanitized class names in `#define` macros**
+  (`CCodeGenerator._generate_defines`): class names were used verbatim as
+  C preprocessor identifiers, which is invalid when they contain spaces,
+  hyphens, or start with a digit.  The new `_sanitize_c_identifier()` helper
+  (already present in `exporters.py` for the C++ exporter) is now shared and
+  applied consistently.  Sanitized names are uppercased
+  (e.g. `"class-A (ok)"` → `CLASS_A__OK_`).
+
+### Tests
+
+- **`tests/test_codegen.py`** fully rewritten:
+  - All fixtures now use **real feature names** (Iris dataset, sensor names
+    with units and spaces) instead of the previous workaround that pre-built
+    `features[i]` strings to mask the bug.
+  - Added `TestFeatureNameBugRegression` class with 5 regression tests that
+    directly verify the bug is absent.
+  - Added regression tree tests, `_sanitize_c_identifier` unit tests, and a
+    monotonicity test for the size estimator.
+- **`tests/test_target_param.py`**: updated `#define setosa 0` assertion to
+  `#define SETOSA 0` to reflect the now-correct identifier sanitization.
+
+---
+
 ## [0.1.0] - 2026-04-15
 
 ### Fixed
@@ -88,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration tests
 - Edge case tests
 
-[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0
 [0.1.0b1]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0b1

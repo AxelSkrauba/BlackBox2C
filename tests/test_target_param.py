@@ -153,7 +153,7 @@ class TestRealDatasetIntegration:
             max_depth=4,
         )
         assert "uint8_t predict(float features[4])" in code
-        assert "#define setosa 0" in code
+        assert "#define SETOSA 0" in code
         assert "if" in code and "return" in code
 
     def test_wine_random_forest(self):

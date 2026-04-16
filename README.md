@@ -45,11 +45,12 @@ pip install blackbox2c
 Requirements: Python 3.8+, NumPy >= 1.21, scikit-learn >= 1.0.
 
 > **Tip:** Use a virtual environment to keep your project isolated:
-> ```bash
-> python -m venv .venv && source .venv/bin/activate  # Linux/macOS
-> python -m venv .venv && .venv\Scripts\activate     # Windows
-> pip install blackbox2c
-> ```
+
+```bash
+# python -m venv .venv && source .venv/bin/activate  # Linux/macOS
+python -m venv .venv && .venv\Scripts\activate     # Windows
+pip install blackbox2c
+```
 
 For development (from source):
 

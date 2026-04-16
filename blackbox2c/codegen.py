@@ -5,6 +5,7 @@ This module converts decision tree structures into optimized C code
 with if-else statements. Supports both classification and regression tasks.
 """
 
+import re
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from typing import List, Optional, Tuple, Union
@@ -148,11 +149,25 @@ class CCodeGenerator:
 #include <stdint.h>
 """
     
+    @staticmethod
+    def _sanitize_c_identifier(name: str) -> str:
+        """
+        Convert an arbitrary string to a valid C identifier.
+
+        Replaces any character that is not alphanumeric or underscore with
+        an underscore, and prepends ``CLS_`` if the name starts with a digit.
+        """
+        sanitized = re.sub(r'[^A-Za-z0-9_]', '_', name)
+        if sanitized and sanitized[0].isdigit():
+            sanitized = 'CLS_' + sanitized
+        return sanitized.upper()
+
     def _generate_defines(self, class_names: List[str]) -> str:
         """Generate class label defines."""
         defines = ["\n/* Class labels */"]
         for i, name in enumerate(class_names):
-            defines.append(f"#define {name} {i}")
+            safe_name = self._sanitize_c_identifier(name)
+            defines.append(f"#define {safe_name} {i}")
         defines.append("")
         return "\n".join(defines)
     
@@ -221,7 +236,6 @@ class CCodeGenerator:
         # Internal node - generate condition
         feature_idx = tree.feature[node_id]
         threshold = tree.threshold[node_id]
-        feature_name = feature_names[feature_idx]
         
         # Format threshold based on precision
         if self.use_fixed_point:
@@ -232,8 +246,10 @@ class CCodeGenerator:
         left_child = tree.children_left[node_id]
         right_child = tree.children_right[node_id]
         
-        # Generate condition
-        code = f"{indent}if ({feature_name} <= {threshold_str}) {{\n"
+        # Generate condition — always use array indexing, never the raw feature
+        # name as a C identifier (feature names may contain spaces and special
+        # characters that are invalid in C expressions).
+        code = f"{indent}if (features[{feature_idx}] <= {threshold_str}) {{\n"
         
         # Recursively generate left subtree
         code += self._generate_tree_logic(tree, feature_names, left_child, depth + 1)
