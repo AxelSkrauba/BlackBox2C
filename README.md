@@ -231,7 +231,7 @@ blackbox2c/
 │   ├── exporters.py     # C++, Arduino, MicroPython exporters
 │   ├── analysis.py      # Feature sensitivity analysis
 │   └── cli.py           # Command-line interface
-├── tests/               # 167 tests, >91% coverage
+├── tests/               # 182 tests, >91% coverage
 ├── notebooks/           # Jupyter notebook examples (runnable on Colab)
 ├── benchmarks/          # Classic dataset benchmarks
 ├── examples/            # Script-based end-to-end examples
