@@ -65,6 +65,10 @@ adl_eda.png
 adl_confusion_rf.png
 adl_feature_importance.png
 
+# Paper artifacts (kept out of git until publication)
+paper/
+results.md
+
 # Misc
 *.log
 *.tmp
