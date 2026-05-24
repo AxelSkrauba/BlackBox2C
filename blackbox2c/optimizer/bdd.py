@@ -245,7 +245,7 @@ class BDDOptimizer:
             n_features=rs.n_features,
             n_classes=rs.n_classes,
             feature_names=rs.feature_names,
-        )
+        ).simplify()
 
         total_nodes = sum(bdd.n_internal_nodes for bdd, _ in bdds)
         self.last_diagnostics_ = {

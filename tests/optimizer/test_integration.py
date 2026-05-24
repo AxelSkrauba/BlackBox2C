@@ -95,44 +95,136 @@ class TestBackwardCompatibility:
 
 
 # ─────────────────────── advanced equivalence ──────────────────────
+def _extract_body(code: str) -> str:
+    """Slice between the function-opening ``{`` and the matching ``}``."""
+    start = code.index("{", code.index("predict("))
+    depth = 0
+    for i in range(start, len(code)):
+        if code[i] == "{":
+            depth += 1
+        elif code[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return code[start + 1:i]
+    raise AssertionError("unbalanced braces in generated code")
+
+
 def _interpret_c(code: str, X: np.ndarray) -> np.ndarray:
-    """Tiny reverse-emit interpreter for the ``RuleSetCodeGenerator``
-    body.  Parses every ``if (... && ...) return N;`` line and applies
-    them in order, plus the trailing default ``return N;``.
+    """Tiny C interpreter for the bodies that this project emits.
 
-    This is a deliberate test-only oracle: if the C body matches, we
-    have full functional equivalence with the optimised RuleSet.
+    Supports the two surfaces we actually generate:
+    1. *Nested if/else*: ``if (features[i] <op> thr) { ... } else { ... }``
+       (legacy codegen and the v0.2 hierarchical bridge).
+    2. *Flat ``&&`` chains*: ``if (a && b) { return N; }`` followed by a
+       trailing ``return N;`` (kept around so older snapshots of the
+       bridge stay testable).
+
+    The interpreter is a tokenless mini-parser: enough to verify that
+    the emitted C, evaluated as Python, agrees with the original model.
     """
-    rule_re = re.compile(
-        r"if \((?P<cond>[^)]+)\) \{\s*return (?P<cls>\d+);\s*\}"
+    body = _extract_body(code)
+    pos = [0]
+
+    cond_re = re.compile(
+        r"features\[(\d+)\]\s*(<=|>)\s*(-?\d+(?:\.\d+)?)f?"
     )
-    fallback_re = re.compile(r"return (\d+);\s*\}\s*$", re.MULTILINE)
+    return_re = re.compile(r"\s*return\s+(\d+)\s*;")
 
-    def parse_lit(lit: str):
-        m = re.match(
-            r"features\[(\d+)\]\s*(<=|>)\s*(-?\d+(?:\.\d+)?)f?", lit.strip()
-        )
-        assert m, f"bad literal: {lit!r}"
-        return int(m.group(1)), m.group(2), float(m.group(3))
+    def skip_ws():
+        while pos[0] < len(body) and body[pos[0]] in " \t\n\r":
+            pos[0] += 1
 
-    rules = []
-    for m in rule_re.finditer(code):
-        lits = [parse_lit(p) for p in m.group("cond").split("&&")]
-        rules.append((lits, int(m.group("cls"))))
-    fallback_match = fallback_re.search(code)
-    fallback = int(fallback_match.group(1)) if fallback_match else 0
+    def parse_block(x: np.ndarray):
+        """Parse a brace-delimited block and return its prediction."""
+        skip_ws()
+        assert body[pos[0]] == "{", f"expected {{ at {pos[0]}: {body[pos[0]:pos[0]+30]!r}"
+        pos[0] += 1
+        result = parse_stmt_list(x)
+        skip_ws()
+        assert body[pos[0]] == "}"
+        pos[0] += 1
+        return result
+
+    def parse_condition(x: np.ndarray) -> bool:
+        # Read a parenthesised condition, possibly joined by &&.
+        skip_ws()
+        assert body[pos[0]] == "("
+        pos[0] += 1
+        depth = 1
+        start = pos[0]
+        while depth:
+            if body[pos[0]] == "(":
+                depth += 1
+            elif body[pos[0]] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            pos[0] += 1
+        cond_str = body[start:pos[0]]
+        pos[0] += 1  # consume )
+        # Evaluate AND-of-literals.
+        result = True
+        for lit in cond_str.split("&&"):
+            m = cond_re.match(lit.strip())
+            assert m, f"bad literal: {lit!r}"
+            f, op, thr = int(m.group(1)), m.group(2), float(m.group(3))
+            ok = (x[f] <= thr) if op == "<=" else (x[f] > thr)
+            result = result and ok
+        return result
+
+    def parse_stmt_list(x: np.ndarray):
+        """Return prediction or ``None`` if no statement fired."""
+        while True:
+            skip_ws()
+            if pos[0] >= len(body) or body[pos[0]] == "}":
+                return None
+            # Try `return N;`
+            m = return_re.match(body, pos[0])
+            if m:
+                pos[0] = m.end()
+                return int(m.group(1))
+            # Else expect `if (...) { ... } [else { ... }]`
+            assert body.startswith("if", pos[0]), \
+                f"unexpected: {body[pos[0]:pos[0]+20]!r}"
+            pos[0] += 2
+            cond_ok = parse_condition(x)
+            if cond_ok:
+                pred = parse_block(x)
+                # Skip any trailing else block without executing it.
+                skip_ws()
+                if body.startswith("else", pos[0]):
+                    pos[0] += 4
+                    _skip_block()
+                if pred is not None:
+                    return pred
+            else:
+                _skip_block()
+                skip_ws()
+                if body.startswith("else", pos[0]):
+                    pos[0] += 4
+                    pred = parse_block(x)
+                    if pred is not None:
+                        return pred
+
+    def _skip_block():
+        skip_ws()
+        assert body[pos[0]] == "{"
+        depth = 0
+        while pos[0] < len(body):
+            if body[pos[0]] == "{":
+                depth += 1
+            elif body[pos[0]] == "}":
+                depth -= 1
+                if depth == 0:
+                    pos[0] += 1
+                    return
+            pos[0] += 1
 
     out = np.empty(len(X), dtype=int)
     for i, x in enumerate(X):
-        pred = fallback
-        for lits, cls in rules:
-            if all(
-                (x[f] <= t) if op == "<=" else (x[f] > t)
-                for f, op, t in lits
-            ):
-                pred = cls
-                break
-        out[i] = pred
+        pos[0] = 0
+        pred = parse_stmt_list(x)
+        out[i] = 0 if pred is None else pred
     return out
 
 
@@ -151,8 +243,10 @@ class TestAdvancedEquivalence:
                 feature_names=[f"f{i}" for i in range(X.shape[1])],
                 class_names=["A", "B", "C"],
             )
-        # The advanced bridge always emits ``&&``-joined conditions.
-        assert "&&" in code
+        # Bridge emits the same nested-if/else surface as legacy
+        # codegen since v0.2-Phase-6; the strong invariant is
+        # functional equivalence, asserted below.
+        assert "<=" in code
 
         rng = np.random.default_rng(7)
         lo, hi = X.min(axis=0), X.max(axis=0)

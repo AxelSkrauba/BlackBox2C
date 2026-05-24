@@ -172,7 +172,7 @@ class QMOptimizer:
             n_features=rs.n_features,
             n_classes=rs.n_classes,
             feature_names=rs.feature_names,
-        )
+        ).simplify()
 
         self.last_diagnostics_ = {
             "n_literals": n_literals,

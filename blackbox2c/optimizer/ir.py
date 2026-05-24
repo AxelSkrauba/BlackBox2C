@@ -94,6 +94,53 @@ class Conjunction:
             mask &= lit.evaluate(X)
         return mask
 
+    def simplify(self) -> Optional["Conjunction"]:
+        """Collapse redundant literals per feature.
+
+        For each feature index appearing in ``self.literals`` we keep,
+        at most, one ``<=`` literal (the *smallest* threshold among
+        the existing ``<=`` ones) and one ``>`` literal (the *largest*
+        threshold among the existing ``>`` ones).  Together they
+        describe an interval ``(lo, hi]`` per feature.
+
+        Returns
+        -------
+        Conjunction or None
+            A new Conjunction with the simplified literal set in a
+            deterministic order (sorted by ``feature_idx`` then op),
+            or ``None`` if the conjunction is unsatisfiable
+            (``lo >= hi`` for some feature).
+        """
+        # Group thresholds per (feature_idx, op).
+        le_min: dict = {}   # feature_idx -> tightest '<=' threshold
+        gt_max: dict = {}   # feature_idx -> tightest '>'  threshold
+        for lit in self.literals:
+            if lit.op == "<=":
+                cur = le_min.get(lit.feature_idx)
+                if cur is None or lit.threshold < cur:
+                    le_min[lit.feature_idx] = lit.threshold
+            else:  # ">"
+                cur = gt_max.get(lit.feature_idx)
+                if cur is None or lit.threshold > cur:
+                    gt_max[lit.feature_idx] = lit.threshold
+
+        # Detect unsatisfiable intervals: ``x > hi AND x <= lo``
+        # with ``hi >= lo`` is empty (the literal "x > hi" rules out
+        # everything that the "x <= lo" admits).
+        for f, lo in gt_max.items():
+            if f in le_min and lo >= le_min[f]:
+                return None
+
+        new_lits = []
+        feats = sorted(set(le_min) | set(gt_max))
+        for f in feats:
+            if f in gt_max:
+                new_lits.append(Literal(f, gt_max[f], ">"))
+            if f in le_min:
+                new_lits.append(Literal(f, le_min[f], "<="))
+
+        return Conjunction(tuple(new_lits), self.prediction)
+
 
 @dataclass(frozen=True)
 class RuleSet:
@@ -178,6 +225,25 @@ class RuleSet:
             "total_literals": total,
             "max_depth": max_depth,
         }
+
+    def simplify(self) -> "RuleSet":
+        """Apply :meth:`Conjunction.simplify` to every rule.
+
+        Unsatisfiable conjunctions are dropped silently — they cannot
+        change the predictions of the original RuleSet.  The remaining
+        rules keep their original order.
+        """
+        new_rules = []
+        for rule in self.rules:
+            simplified = rule.simplify()
+            if simplified is not None:
+                new_rules.append(simplified)
+        return RuleSet(
+            rules=tuple(new_rules),
+            n_features=self.n_features,
+            n_classes=self.n_classes,
+            feature_names=self.feature_names,
+        )
 
     def unique_literals(self) -> Tuple[Literal, ...]:
         """All distinct literals appearing in the RuleSet (canonical form).
