@@ -164,7 +164,9 @@ from blackbox2c import Converter, ConversionConfig
 
 config = ConversionConfig(
     max_depth=5,             # Surrogate tree depth (1-10, default 5)
-    optimize_rules='medium', # 'low' | 'medium' | 'high'
+    optimize_rules='medium', # 'low' | 'medium' | 'high' | 'qm' | 'bdd' | 'auto'
+    qm_max_literals=12,      # Hard cap on literals processed by QM (v0.2+)
+    bdd_max_literals=24,     # Hard cap on literals processed by BDD (v0.2+)
     use_fixed_point=False,   # Use integer arithmetic instead of float
     precision=8,             # Bit width for fixed-point: 8 | 16 | 32
     function_name='predict', # Name of the generated function
@@ -178,6 +180,25 @@ code = converter.convert(model, X_train, target='arduino')
 metrics = converter.get_metrics()
 # {'fidelity': 0.97, 'complexity': {...}, 'size_estimate': {...}}
 ```
+
+### Rule optimization levels
+
+| Level    | Algorithm                                                                                   | Notes                                                            |
+|----------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| `low`    | No post-processing.                                                                         | Returns the surrogate tree as-is.                                |
+| `medium` | Prune internal nodes whose direct children are same-class leaves.                           | Default. Backward-compatible with v0.1.                          |
+| `high`   | `medium` + merge sibling leaves with very similar class distributions.                      | Backward-compatible with v0.1.                                   |
+| `qm`     | Multi-valued **Quine-McCluskey** boolean minimisation lifted to continuous splits. *(v0.2)* | Classification only. Capped by `qm_max_literals`.                |
+| `bdd`    | Frequency-ordered **Reduced Ordered BDD** rebuilt as a tree. *(v0.2)*                       | Classification only. Capped by `bdd_max_literals`.               |
+| `auto`   | Runs every applicable optimiser plus the no-op baseline; returns the smallest. *(v0.2)*     | Recommended default if you only care about code size.            |
+
+Advanced levels (`qm`, `bdd`, `auto`) preserve **100 % functional
+equivalence** with the surrogate tree (verified by the test suite).
+On regression they emit a single `UserWarning` and fall back to the
+legacy `'high'` path.  Best-case savings on the benchmark
+([`results_v0.2.md`](results_v0.2.md)): **−47 % FLASH** on Iris +
+RandomForest.  See [`notebooks/07_advanced_optimization.ipynb`](notebooks/07_advanced_optimization.ipynb)
+for a guided walkthrough.
 
 ---
 

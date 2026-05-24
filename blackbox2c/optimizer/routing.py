@@ -111,29 +111,77 @@ def optimize_ruleset(
 
     # ── auto routing ───────────────────────────────────────────────
     assert level == "auto"
-    if n_lits <= qm_max_literals:
-        _logger.info(
-            "optimize_rules='auto' with %d unique literals → using 'qm'.",
-            n_lits,
-        )
-        return QMOptimizer(max_literals=qm_max_literals).minimize(rs)
-    if n_lits <= bdd_max_literals:
-        _logger.info(
-            "optimize_rules='auto' with %d unique literals → using 'bdd'.",
-            n_lits,
-        )
-        return BDDOptimizer(max_literals=bdd_max_literals).minimize(rs)
+    return _auto_route(rs, n_lits, qm_max_literals, bdd_max_literals)
 
-    warnings.warn(
-        f"optimize_rules='auto' could not pick QM or BDD: {n_lits} "
-        f"unique literals exceed both qm_max_literals={qm_max_literals} "
-        f"and bdd_max_literals={bdd_max_literals}.  Returning the "
-        "RuleSet unchanged; the upstream legacy 'high' pruning still "
-        "applies.",
-        UserWarning,
-        stacklevel=2,
+
+def _auto_route(
+    rs: RuleSet,
+    n_lits: int,
+    qm_max_literals: int,
+    bdd_max_literals: int,
+) -> RuleSet:
+    """Pick the smallest-FLASH option among {no-op, QM, BDD}.
+
+    Earlier ``auto`` was a strict cap-based dispatcher: try QM first,
+    BDD as a backup, no-op only if both rejected.  In practice that
+    sometimes preferred BDD over keeping the input RuleSet, even when
+    BDD enumeration produced a *larger* tree (Iris-SVM was a notable
+    case: +122% over the legacy baseline).
+
+    The new policy runs every applicable optimizer, estimates the
+    code-size of each alternative through the same shape estimator the
+    bridge codegen uses at emission time, and returns the smallest.
+    Lazy-imported to avoid a circular dependency between
+    :mod:`routing` and :mod:`codegen_bridge`.
+    """
+    # Baseline: emit the input RuleSet as-is.
+    candidates: list[tuple[int, str, RuleSet]] = []
+    baseline_size = _estimate_size(rs)
+    candidates.append((baseline_size, "noop", rs))
+
+    if n_lits <= qm_max_literals:
+        qm_rs = QMOptimizer(max_literals=qm_max_literals).minimize(rs)
+        candidates.append((_estimate_size(qm_rs), "qm", qm_rs))
+    if n_lits <= bdd_max_literals:
+        bdd_rs = BDDOptimizer(max_literals=bdd_max_literals).minimize(rs)
+        candidates.append((_estimate_size(bdd_rs), "bdd", bdd_rs))
+
+    # Stable: ties broken by insertion order (noop, qm, bdd).
+    best_size, best_name, best_rs = min(candidates, key=lambda c: c[0])
+    _logger.info(
+        "optimize_rules='auto' with %d unique literals — picked %s "
+        "(estimated FLASH: %d B)",
+        n_lits, best_name, best_size,
     )
-    return rs
+
+    if best_name == "noop" and not (
+        n_lits <= qm_max_literals or n_lits <= bdd_max_literals
+    ):
+        warnings.warn(
+            f"optimize_rules='auto' could not pick QM or BDD: "
+            f"{n_lits} unique literals exceed both "
+            f"qm_max_literals={qm_max_literals} and "
+            f"bdd_max_literals={bdd_max_literals}.  Returning the "
+            "RuleSet unchanged; the upstream legacy 'high' pruning "
+            "still applies.",
+            UserWarning,
+            stacklevel=3,
+        )
+    return best_rs
+
+
+def _estimate_size(rs: RuleSet) -> int:
+    """Estimated FLASH bytes when ``rs`` is emitted by the bridge codegen.
+
+    Imported lazily to avoid a circular ``routing → codegen_bridge →
+    optimizer.routing`` dependency at module load.
+    """
+    from ..codegen_bridge import RuleSetCodeGenerator  # noqa: WPS433
+    gen = RuleSetCodeGenerator()
+    # ``_tree_shape`` only inspects rule structure; ``task_type`` not
+    # required for size estimation.
+    n_internal, n_leaves = gen._tree_shape(list(rs.rules))
+    return 50 + n_internal * 12 + n_leaves * 4
 
 
 def is_advanced_level(level: str) -> bool:
