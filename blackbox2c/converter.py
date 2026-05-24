@@ -7,10 +7,15 @@ from sklearn.base import BaseEstimator, is_regressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from typing import Optional, Union, Dict, Any
 
+import warnings
+
 from .config import ConversionConfig
 from .surrogate import SurrogateExtractor
 from .codegen import CCodeGenerator
+from .codegen_bridge import RuleSetCodeGenerator
 from .optimizer import RuleOptimizer
+from .optimizer.extraction import from_sklearn_tree
+from .optimizer.routing import is_advanced_level, optimize_ruleset
 from .exporters import create_exporter
 
 
@@ -212,21 +217,84 @@ class Converter:
         complexity = optimizer.analyze_complexity(self.surrogate_tree_)
         print(f"  Nodes: {complexity['n_nodes']}, Leaves: {complexity['n_leaves']}, Depth: {complexity['max_depth']}")
         self.metrics_['complexity'] = complexity
-        
+
+        # ── Advanced (IR-level) optimization (v0.2) ──────────────
+        # Run after the legacy pass so QM/BDD see an already-pruned tree.
+        # Regression tasks fall back to the legacy 'high' behaviour with
+        # a single user-facing warning.
+        self.optimized_ruleset_ = None
+        if is_advanced_level(self.config.optimize_rules):
+            if is_regression:
+                warnings.warn(
+                    f"optimize_rules={self.config.optimize_rules!r} is "
+                    "only defined for classification; regression "
+                    "tasks keep the legacy 'high' optimisation path.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            else:
+                print(
+                    f"\n[2b/4] Running advanced optimizer "
+                    f"({self.config.optimize_rules!r})..."
+                )
+                rs_in = from_sklearn_tree(
+                    self.surrogate_tree_, feature_names=self.feature_names_
+                )
+                rs_out = optimize_ruleset(
+                    rs_in,
+                    level=self.config.optimize_rules,
+                    qm_max_literals=self.config.qm_max_literals,
+                    bdd_max_literals=self.config.bdd_max_literals,
+                )
+                self.optimized_ruleset_ = rs_out
+                self.metrics_['ruleset_n_rules_in'] = len(rs_in.rules)
+                self.metrics_['ruleset_n_rules_out'] = len(rs_out.rules)
+                print(
+                    f"  RuleSet rules: {len(rs_in.rules)} -> "
+                    f"{len(rs_out.rules)}"
+                )
+
         # Generate C code
         print("\n[3/4] Generating C code...")
-        code_generator = CCodeGenerator(
-            function_name=self.config.function_name,
-            use_fixed_point=self.config.use_fixed_point,
-            precision=self.config.precision,
-            optimize_rules=self.config.optimize_rules
-        )
-        
-        c_code = code_generator.generate(self.surrogate_tree_, self.feature_names_, self.class_names_)
-        
+
+        # If the advanced pass produced an IR, emit C straight from it
+        # via the bridge generator; otherwise fall back to the
+        # tree-based codegen.  Non-C targets stay on the legacy path
+        # for now (their exporters have not been updated to consume
+        # IR yet — tracked for v0.3).
+        if self.optimized_ruleset_ is not None and target.lower() == 'c':
+            code_generator = RuleSetCodeGenerator(
+                function_name=self.config.function_name,
+                use_fixed_point=self.config.use_fixed_point,
+                precision=self.config.precision,
+                optimize_rules=self.config.optimize_rules,
+            )
+            c_code = code_generator.generate_from_ruleset(
+                self.optimized_ruleset_,
+                self.feature_names_,
+                self.class_names_,
+            )
+        else:
+            code_generator = CCodeGenerator(
+                function_name=self.config.function_name,
+                use_fixed_point=self.config.use_fixed_point,
+                precision=self.config.precision,
+                optimize_rules=self.config.optimize_rules,
+            )
+            c_code = code_generator.generate(
+                self.surrogate_tree_, self.feature_names_, self.class_names_
+            )
+
         # Estimate code size
         print("\n[4/4] Estimating code size...")
-        size_estimate = code_generator.estimate_code_size(self.surrogate_tree_)
+        if self.optimized_ruleset_ is not None and isinstance(
+            code_generator, RuleSetCodeGenerator
+        ):
+            size_estimate = code_generator.estimate_code_size_from_ruleset(
+                self.optimized_ruleset_
+            )
+        else:
+            size_estimate = code_generator.estimate_code_size(self.surrogate_tree_)
         print(f"  Estimated FLASH: {size_estimate['flash_bytes']} bytes, RAM: {size_estimate['ram_bytes']} bytes")
         self.metrics_['size_estimate'] = size_estimate
         
