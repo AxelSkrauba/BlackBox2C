@@ -55,17 +55,50 @@ A deeper surrogate captures more decision boundaries at the cost of larger gener
 
 ## Stage 2: Rule Optimization
 
-The optimizer simplifies the surrogate tree without retraining. Two strategies:
+The optimizer simplifies the surrogate tree without retraining. Six levels are available
+via `optimize_rules`:
 
-### Branch Pruning (`optimize_rules='medium'` or `'high'`)
+### Branch Pruning (`'medium'`, `'high'`)
 
 Scans for internal nodes where **both children are leaves with the same prediction**.
 These are collapsed into a single leaf, reducing the if-else depth.
 
-### Leaf Merging (`optimize_rules='high'`)
+### Leaf Merging (`'high'`)
 
 Merges sibling leaves when their class probability distributions are highly similar
 (cosine similarity > 0.95), further reducing the number of output paths.
+
+### Literal Simplification *(v0.2)*
+
+Applied automatically by every advanced level. Within each conjunction, multiple
+literals on the same feature are collapsed into a single `(lo, hi]` interval; rules
+with empty intervals are detected as unsatisfiable and dropped.
+Implemented in `Conjunction.simplify` / `RuleSet.simplify`.
+
+### Quine-McCluskey (`'qm'`, v0.2)
+
+Multi-valued Quine-McCluskey boolean minimisation lifted to continuous splits. The
+surrogate tree is converted into a `RuleSet`, each unique threshold becomes a
+multi-valued literal, and the QM tabular method merges minterms class-by-class.
+Gated by `qm_max_literals` (default 12) and an internal `max_minterms=4096` cap;
+over-cap inputs return unchanged with a `UserWarning`.
+
+### Reduced Ordered BDD (`'bdd'`, v0.2)
+
+One ROBDD per output class is built with frequency-ordered variables and a unique
+table. Re-emission enumerates true-paths back into a `RuleSet`. Capped by
+`bdd_max_literals` (default 20).
+
+### Auto Routing (`'auto'`, v0.2)
+
+Runs every applicable optimiser plus the no-op baseline, estimates FLASH cost via
+the bridge codegen's tree-shape model, and returns the smallest. Never regresses
+below the `'medium'` baseline on the in-tree benchmark.
+
+> **NOTE**:
+    Advanced levels (`'qm'`, `'bdd'`, `'auto'`) are classification-only. On
+    regression tasks they emit a single `UserWarning` and fall back to `'high'`.
+    Legacy levels (`'low'`, `'medium'`, `'high'`) produce byte-identical output to v0.1.
 
 ---
 
@@ -73,6 +106,14 @@ Merges sibling leaves when their class probability distributions are highly simi
 
 The optimized tree is serialized as a recursive if-else function. Each internal node
 becomes an `if` condition; each leaf becomes a `return` statement.
+
+### Hierarchical bridge codegen *(v0.2)*
+
+When an advanced level is requested, the optimised `RuleSet` is fed to a hierarchical
+rebuilder (`RuleSetCodeGenerator`) that reconstructs a decision tree using a
+split-on-most-frequent-literal heuristic. This preserves prefix sharing and emits the
+same nested if/else surface as the legacy generator, so downstream tooling sees no
+difference.
 
 ### Feature name injection
 

@@ -66,6 +66,7 @@ Returns a `dict` with conversion metrics:
 | `feature_names_` | Feature names used in code generation |
 | `class_names_` | Class names (classification only) |
 | `metrics_` | Same as `get_metrics()` |
+| `optimized_ruleset_` | *(v0.2)* The optimised `RuleSet` when an advanced level (`'qm'`, `'bdd'`, `'auto'`) was requested; `None` for legacy levels. See [Optimizer (advanced)](optimizer.md). |
 
 ## Example
 

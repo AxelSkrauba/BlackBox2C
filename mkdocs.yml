@@ -3,7 +3,7 @@ site_description: Convert scikit-learn models to optimized embedded code (C, C++
 site_url: https://axelskrauba.github.io/BlackBox2C
 repo_url: https://github.com/AxelSkrauba/BlackBox2C
 repo_name: AxelSkrauba/BlackBox2C
-copyright: Copyright &copy; 2025 BlackBox2C
+copyright: Copyright &copy; 2025-2026 BlackBox2C
 
 theme:
   name: material
@@ -63,6 +63,7 @@ nav:
       - ConversionConfig: api/config.md
       - Exporters: api/exporters.md
       - FeatureSensitivityAnalyzer: api/analysis.md
+      - Optimizer (advanced): api/optimizer.md
       - CLI: api/cli.md
   - Examples: examples.md
   - Notebooks:
@@ -72,5 +73,6 @@ nav:
       - Feature Analysis: notebooks/04_feature_analysis.ipynb
       - Multi-Format Export: notebooks/05_multi_format_export.ipynb
       - End-to-End IoT (ADL): notebooks/06_end_to_end_iot.ipynb
+      - Advanced Optimization (v0.2): notebooks/07_advanced_optimization.ipynb
   - Comparison: comparison.md
   - Roadmap: roadmap.md

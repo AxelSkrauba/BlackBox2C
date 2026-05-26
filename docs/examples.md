@@ -12,6 +12,7 @@ For hands-on, fully-executed examples with rendered outputs, see the [Notebooks]
 | [Feature Analysis](notebooks/04_feature_analysis.ipynb) | Sensor reduction, BOM impact |
 | [Multi-Format Export](notebooks/05_multi_format_export.ipynb) | C, C++, Arduino, MicroPython |
 | [End-to-End IoT (ADL)](notebooks/06_end_to_end_iot.ipynb) | Full pipeline on a real gas-sensor dataset |
+| [Advanced Optimization (v0.2)](notebooks/07_advanced_optimization.ipynb) | Quine-McCluskey, BDD, and `'auto'` compared on Iris+RandomForest |
 
 ---
 
@@ -37,6 +38,32 @@ python examples/iris_example.py
 ---
 
 ## Code Recipes
+
+### Advanced rule optimization (v0.2)
+
+For classification models, the `'auto'` level evaluates Quine-McCluskey, BDD, and the
+no-op baseline, and returns the variant with the smallest estimated FLASH footprint:
+
+```python
+from blackbox2c import convert, ConversionConfig
+
+config = ConversionConfig(
+    max_depth=5,
+    optimize_rules='auto',     # try qm, bdd, no-op; pick smallest FLASH
+    qm_max_literals=12,        # cap before QM falls back to identity
+    bdd_max_literals=20,       # cap before BDD falls back to identity
+)
+
+c_code = convert(model, X_train, config=config)
+```
+
+Typical savings on Iris+RandomForest: **−47 % FLASH** vs `'medium'`. See
+[`benchmarks/results/v0.2.md`](https://github.com/AxelSkrauba/BlackBox2C/blob/main/benchmarks/results/v0.2.md)
+and the [Advanced Optimization notebook](notebooks/07_advanced_optimization.ipynb).
+
+!!! note
+    Advanced levels (`'qm'`, `'bdd'`, `'auto'`) are classification-only.
+    On regression tasks they emit a single `UserWarning` and fall back to `'high'`.
 
 ### Fixed-point for AVR (Arduino Uno)
 

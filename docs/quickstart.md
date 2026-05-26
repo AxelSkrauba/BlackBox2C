@@ -138,6 +138,39 @@ print(f"Est. FLASH: {metrics['size_estimate']['flash_bytes']} bytes")
 
 ---
 
+## Advanced Optimization (v0.2)
+
+For classification models, three new `optimize_rules` levels apply boolean minimisation
+to the surrogate tree before code generation:
+
+```python
+from blackbox2c import convert, ConversionConfig
+
+# 'auto' tries qm, bdd, and the no-op baseline, then picks the smallest FLASH
+config = ConversionConfig(
+    max_depth=5,
+    optimize_rules='auto',
+    qm_max_literals=12,
+    bdd_max_literals=20,
+)
+
+c_code = convert(model, X_train, config=config)
+```
+
+| Level | Algorithm | Notes |
+|---|---|---|
+| `'qm'` | Multi-valued Quine-McCluskey | Capped by `qm_max_literals`. |
+| `'bdd'` | Reduced Ordered BDD (frequency-ordered) | Capped by `bdd_max_literals`. |
+| `'auto'` | Smallest-FLASH of all options | Recommended default for code size. |
+
+Functional equivalence with the surrogate tree is preserved at 100 %. On regression tasks
+advanced levels emit a single `UserWarning` and fall back to `'high'`. See the
+[Advanced Optimization notebook](notebooks/07_advanced_optimization.ipynb) and
+[`benchmarks/results/v0.2.md`](https://github.com/AxelSkrauba/BlackBox2C/blob/main/benchmarks/results/v0.2.md)
+for benchmark results (up to **−47 % FLASH** on Iris+RandomForest).
+
+---
+
 ## Feature Analysis
 
 ```python

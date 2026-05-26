@@ -21,6 +21,7 @@ All comparisons are based on publicly available documentation and source code.
 | Feature selection | Yes | No | No | No | No |
 | Memory budget control | Yes | No | No | Partial | Partial |
 | Regression support | Yes | Partial | No | Yes | Yes |
+| Advanced rule optimization (QM/BDD) | Yes (v0.2) | No | No | No | No |
 | Open source | Yes | Yes | Yes | Yes | No |
 
 ---
@@ -40,6 +41,7 @@ of decision trees and ensemble models.
 - Generates readable if-else code instead of arrays
 - Multiple output formats (C++, Arduino, MicroPython)
 - Built-in feature sensitivity analysis
+- Boolean minimisation (Quine-McCluskey, BDD) — up to **−47 % FLASH** vs `'medium'` on Iris+RandomForest *(v0.2)*
 
 ---
 

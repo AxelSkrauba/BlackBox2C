@@ -28,6 +28,7 @@ restrict you to certain model types. BlackBox2C takes a different approach:
 | Feature sensitivity analysis | Identify and remove unimportant features |
 | Memory budget control | Auto-tune parameters to fit a target KB |
 | Zero runtime dependencies | Generated code is self-contained |
+| Advanced rule optimization (v0.2) | Quine-McCluskey, BDD, and auto-routing — up to **−47 % FLASH** on classification models |
 
 ---
 
@@ -64,4 +65,4 @@ Requires Python 3.8+, NumPy >= 1.21, scikit-learn >= 1.0.
 
 ## License
 
-[MIT](https://github.com/AxelSkrauba/BlackBox2C/blob/main/LICENSE) — BlackBox2C Team
+[MIT](https://github.com/AxelSkrauba/BlackBox2C/blob/main/LICENSE) — Axel Skrauba
