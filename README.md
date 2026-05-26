@@ -196,7 +196,7 @@ Advanced levels (`qm`, `bdd`, `auto`) preserve **100 % functional
 equivalence** with the surrogate tree (verified by the test suite).
 On regression they emit a single `UserWarning` and fall back to the
 legacy `'high'` path.  Best-case savings on the benchmark
-([`results_v0.2.md`](results_v0.2.md)): **−47 % FLASH** on Iris +
+([`benchmarks/results/v0.2.md`](benchmarks/results/v0.2.md)): **−47 % FLASH** on Iris +
 RandomForest.  See [`notebooks/07_advanced_optimization.ipynb`](notebooks/07_advanced_optimization.ipynb)
 for a guided walkthrough.
 

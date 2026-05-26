@@ -70,7 +70,7 @@ produces byte-identical C code to v0.1.
 - **Benchmark suite v0.2**
   (`benchmarks/benchmark_optimization_levels.py`): sweep across
   Iris/Wine + 4 model families + 6 levels, captured in
-  `results_v0.2.md`.
+  `benchmarks/results/v0.2.md`.
 - **Tutorial notebook** (`notebooks/07_advanced_optimization.ipynb`,
   mirrored under `docs/notebooks/`): illustrates the new API on
   Iris+RandomForest with a FLASH bar chart and a discussion of
