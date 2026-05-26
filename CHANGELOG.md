@@ -226,7 +226,8 @@ Functional equivalence preserved at 100 % across every case.
 - Integration tests
 - Edge case tests
 
-[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0
 [0.1.0b1]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0b1
