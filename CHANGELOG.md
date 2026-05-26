@@ -8,12 +8,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Advanced rule optimization: Quine-McCluskey boolean minimization, BDDs
 - Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)
+- IR-aware exporters (C++, Arduino, MicroPython): currently advanced
+  optimisation only feeds the C target; the platform-specific exporters
+  still consume the surrogate sklearn tree.
 - CLI batch conversion from config file
 - More export formats
 - Quantization-aware training integration
 - SIMD / vectorization hints for Cortex-M4/M7
+
+---
+
+## [0.2.0] - 2026-05-23
+
+Advanced rule-optimisation pipeline.  Backward-compatible: every
+existing `optimize_rules` value (`'low'`, `'medium'`, `'high'`)
+produces byte-identical C code to v0.1.
+
+### Added
+
+- **Immutable IR layer** (`blackbox2c.optimizer.ir`): `Literal`,
+  `Conjunction`, `RuleSet` frozen dataclasses with a strict
+  evaluation contract.  Includes `RuleSet.predict`,
+  `RuleSet.complexity` and `RuleSet.unique_literals` for downstream
+  consumption.
+- **`Conjunction.simplify` / `RuleSet.simplify`**: collapse
+  redundant per-feature literals into a single `(lo, hi]` interval
+  and drop unsatisfiable rules.  Applied automatically by QM and
+  BDD before re-emission.
+- **`from_sklearn_tree`** (`blackbox2c.optimizer.extraction`):
+  lossless conversion of any scikit-learn tree (classifier or
+  regressor) into a `RuleSet`.
+- **Quine-McCluskey optimiser**
+  (`blackbox2c.optimizer.qm.QMOptimizer`): multi-valued boolean
+  minimisation lifted to continuous splits.  Hard caps
+  (`max_literals=12`, `max_minterms=4096`) gate the search; over-cap
+  inputs return unchanged with a `UserWarning`.
+- **ROBDD optimiser** (`blackbox2c.optimizer.bdd.BDDOptimizer`):
+  reduced-ordered BDD with frequency-ordered variables and a
+  unique-table.  One BDD per output class, then re-emit by
+  enumerating true-paths.
+- **Routing layer** (`blackbox2c.optimizer.routing.optimize_ruleset`,
+  `is_advanced_level`): three new `optimize_rules` values
+  (`'qm'`, `'bdd'`, `'auto'`) plus the cap parameters
+  `qm_max_literals` and `bdd_max_literals` on `ConversionConfig`.
+  `'auto'` runs every applicable optimiser, estimates the FLASH cost
+  via the bridge codegen's tree-shape model, and returns the
+  smallest – never regressing below the `'medium'` baseline on the
+  in-tree benchmark.
+- **Hierarchical bridge codegen**
+  (`blackbox2c.codegen_bridge.RuleSetCodeGenerator`): rebuilds a
+  decision tree from the optimised RuleSet using a
+  split-on-most-frequent-literal heuristic and emits the same nested
+  if/else surface as the legacy generator, preserving prefix
+  sharing.
+- **Regression-safety net**: every advanced level emits a single
+  `UserWarning` and falls back to the legacy `'high'` path on
+  regression tasks; documented at `ConversionConfig`,
+  `Converter.convert`, `QMOptimizer`, `BDDOptimizer`, and the
+  router.
+- **Benchmark suite v0.2**
+  (`benchmarks/benchmark_optimization_levels.py`): sweep across
+  Iris/Wine + 4 model families + 6 levels, captured in
+  `benchmarks/results/v0.2.md`.
+- **Tutorial notebook** (`notebooks/07_advanced_optimization.ipynb`,
+  mirrored under `docs/notebooks/`): illustrates the new API on
+  Iris+RandomForest with a FLASH bar chart and a discussion of
+  caveats.
+
+### Changed
+
+- `ConversionConfig.optimize_rules`'s type annotation widened from
+  `Literal['low', 'medium', 'high']` to include `'qm'`, `'bdd'`,
+  `'auto'`.  Existing values keep their exact semantics.
+- `Converter.convert` now stores the optimised `RuleSet` (when an
+  advanced level is requested) on `Converter.optimized_ruleset_`
+  for downstream inspection.
+- The legacy `RuleOptimizer` accepts the new level strings: it
+  treats them as `'medium'` internally so QM/BDD always see a
+  pruned input tree.
+
+### Performance
+
+Estimated FLASH (heuristic, not yet validated against a compiled
+binary) on the Iris+Wine benchmark, best-of-{qm, bdd, auto} vs
+legacy `'medium'`:
+
+| Case | `'medium'` | best v0.2 | Δ |
+|---|---|---|---|
+| Iris + RandomForest | 222 B | 118 B (qm/bdd/auto) | **−47 %** |
+| Iris + MLP | 262 B | 214 B (qm) | **−18 %** |
+| Wine + RandomForest | 254 B | 214 B (bdd) | **−16 %** |
+| Iris + SVM | 262 B | 230 B (qm) | **−12 %** |
+| Iris + DecisionTree | 166 B | 166 B (auto) | tie |
+
+Functional equivalence preserved at 100 % across every case.
+
+### Tests
+
+- 79 new tests (212 → 293), grouped under `tests/optimizer/`:
+  `test_ir.py`, `test_extraction.py`, `test_qm.py`, `test_bdd.py`,
+  `test_simplify.py`, `test_routing.py`, `test_integration.py`.
+- Property-based equivalence via Hypothesis on QM and BDD outputs
+  vs `tree.predict`.
+- An end-to-end mini-interpreter (`test_integration.py::_interpret_c`)
+  that parses the generated C body and validates it against the
+  original sklearn tree on a held-out grid.
 
 ---
 

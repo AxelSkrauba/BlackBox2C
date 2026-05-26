@@ -23,8 +23,34 @@ class ConversionConfig:
         8-bit is optimal for most MCUs; 16-bit balances range and size;
         32-bit matches standard int32_t width. Affects model size and accuracy.
         
-    optimize_rules : Literal['low', 'medium', 'high'], default='medium'
+    optimize_rules : Literal['low', 'medium', 'high', 'qm', 'bdd', 'auto'], default='medium'
         Level of rule optimization to reduce redundancies.
+
+        - ``'low'``: no post-processing.
+        - ``'medium'``: prune internal nodes whose direct children are
+          same-class leaves (legacy).
+        - ``'high'``: ``'medium'`` + merge sibling leaves with very
+          similar class distributions (legacy).
+        - ``'qm'``: multi-valued Quine-McCluskey boolean minimization
+          on top of ``'medium'`` (introduced in v0.2).
+        - ``'bdd'``: ROBDD-based reduction on top of ``'medium'``
+          (introduced in v0.2).
+        - ``'auto'``: pick ``'qm'``, ``'bdd'`` or fall back to
+          ``'high'`` based on the number of unique literals in the
+          extracted RuleSet (introduced in v0.2).
+
+        Advanced levels (``'qm'``, ``'bdd'``, ``'auto'``) only apply
+        to classification tasks; on regression they emit a
+        :class:`UserWarning` and behave like ``'high'``.
+
+    qm_max_literals : int, default=12
+        Hard cap on the number of unique ``(feature, threshold)`` pairs
+        that the QM optimizer accepts.  Beyond this cap QM falls back
+        to a no-op.  Used both directly for ``optimize_rules='qm'``
+        and as the QM threshold in ``'auto'`` routing.
+
+    bdd_max_literals : int, default=24
+        Same as ``qm_max_literals`` but for the BDD optimizer.
         
     feature_threshold : Optional[int], default=None
         Maximum number of features to use after automatic selection.
@@ -58,7 +84,7 @@ class ConversionConfig:
     
     max_depth: int = 5
     precision: int = 8
-    optimize_rules: Literal['low', 'medium', 'high'] = 'medium'
+    optimize_rules: Literal['low', 'medium', 'high', 'qm', 'bdd', 'auto'] = 'medium'
     feature_threshold: Optional[int] = None
     memory_budget_kb: Optional[float] = None
     use_fixed_point: bool = False
@@ -66,6 +92,8 @@ class ConversionConfig:
     include_probabilities: bool = False
     n_samples: int = 10000
     random_state: Optional[int] = 42
+    qm_max_literals: int = 12
+    bdd_max_literals: int = 24
     
     def __post_init__(self):
         """Validate configuration parameters."""
@@ -75,8 +103,18 @@ class ConversionConfig:
         if self.precision not in [8, 16, 32]:
             raise ValueError("precision must be 8, 16, or 32")
         
-        if self.optimize_rules not in ['low', 'medium', 'high']:
-            raise ValueError("optimize_rules must be 'low', 'medium', or 'high'")
+        valid_levels = ('low', 'medium', 'high', 'qm', 'bdd', 'auto')
+        if self.optimize_rules not in valid_levels:
+            raise ValueError(
+                f"optimize_rules must be one of {valid_levels}, "
+                f"got {self.optimize_rules!r}"
+            )
+
+        if self.qm_max_literals < 0:
+            raise ValueError("qm_max_literals must be >= 0")
+
+        if self.bdd_max_literals < 0:
+            raise ValueError("bdd_max_literals must be >= 0")
         
         if self.feature_threshold is not None and self.feature_threshold < 1:
             raise ValueError("feature_threshold must be at least 1")

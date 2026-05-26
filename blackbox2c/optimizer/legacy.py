@@ -45,14 +45,21 @@ class RuleOptimizer:
         """
         if self.optimization_level == 'low':
             return tree
-        
+
+        # Advanced levels (qm/bdd/auto) introduced in v0.2 still benefit
+        # from the medium-level pruning before they take over at the IR
+        # layer; route them here to the same 'medium' code path.
+        effective = self.optimization_level
+        if effective in ('qm', 'bdd', 'auto'):
+            effective = 'medium'
+
         # Apply optimizations based on level
-        if self.optimization_level in ['medium', 'high']:
+        if effective in ('medium', 'high'):
             self._prune_redundant_branches(tree)
-        
-        if self.optimization_level == 'high':
+
+        if effective == 'high':
             self._merge_similar_leaves(tree)
-        
+
         return tree
     
     def _prune_redundant_branches(
