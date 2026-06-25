@@ -19,6 +19,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-06-25
+
+Bugfix release.  Resolves the ``features[-2]`` issue reported against
+v0.2.0, where converting a model to Arduino/C++/MicroPython C code with
+``optimize_rules='medium'``, ``'high'``, ``'auto'``, ``'qm'`` or
+``'bdd'`` could emit ``features[-2]`` — an invalid negative array index
+in C that ``avr-gcc`` and ``xtensa-gcc`` accept silently, making the
+bug dangerous on embedded hardware.
+
+### Fixed
+
+- **`optimizer/legacy.py`**: `_prune_redundant_branches` and
+  `_merge_similar_leaves` now update *all four* structural attributes
+  (`feature`, `threshold`, `children_left`, `children_right`) — plus
+  the combined `value` — when converting an internal node to a leaf.
+  Previously only `feature` (and, for merge, `threshold`) was set to
+  the leaf sentinel, leaving `children_left`/`children_right` pointing
+  at the original children.  The platform exporters detect leaves via
+  `children_left == children_right` and therefore treated the
+  half-mutated node as an internal split, reading `feature[node] == -2`
+  and emitting `features[-2]`.
+- **Unified leaf-detection convention**: added
+  `blackbox2c/tree_constants.py` with the shared `TREE_LEAF` / `TREE_UNDEFINED`
+  sentinels and an `is_leaf()` helper that accepts either signal.
+  `codegen.py`, `exporters.py` (C++/Arduino/MicroPython) and
+  `optimizer/extraction.py` now all use this single robust detector,
+  eliminating the dual-convention fragility that allowed the bug.
+- As a side effect, pruning now actually collapses redundant nodes to
+  a single `return` (in v0.2.0 the dead `if/else` with two identical
+  returns was still emitted, so 'medium' produced the same code size
+  as 'low').
+
+### Affected
+
+- Targets: `arduino`, `cpp`, `micropython` (the `c` target was
+  coincidentally safe because `CCodeGenerator` already used
+  `feature == -2` for leaf detection).
+- Models: any whose surrogate tree contains prunable nodes (confirmed
+  with `RandomForestClassifier` and `MLPClassifier` on Iris).
+- Workaround for v0.2.0 users: `optimize_rules='low'`.
+
+---
+
 ## [0.2.0] - 2026-05-23
 
 Advanced rule-optimisation pipeline.  Backward-compatible: every
