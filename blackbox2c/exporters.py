@@ -14,6 +14,8 @@ from typing import Union, Optional, List
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 import numpy as np
 
+from .tree_constants import is_leaf
+
 
 class BaseExporter(ABC):
     """
@@ -261,7 +263,10 @@ public:
             node_indent = ' ' * (indent + depth * 4)
             
             # Check if leaf node
-            if tree_struct['children_left'][node_id] == tree_struct['children_right'][node_id]:
+            if is_leaf(
+                tree_struct['feature'], tree_struct['children_left'],
+                tree_struct['children_right'], node_id,
+            ):
                 # Leaf node
                 value = tree_struct['value'][node_id]
                 if self.task_type_ == 'classification':
@@ -441,7 +446,10 @@ class ArduinoExporter(BaseExporter):
         def recurse(node_id: int, depth: int) -> str:
             node_indent = ' ' * (indent + depth * 4)
             
-            if tree_struct['children_left'][node_id] == tree_struct['children_right'][node_id]:
+            if is_leaf(
+                tree_struct['feature'], tree_struct['children_left'],
+                tree_struct['children_right'], node_id,
+            ):
                 value = tree_struct['value'][node_id]
                 if self.task_type_ == 'classification':
                     class_id = np.argmax(value)
@@ -644,7 +652,10 @@ class {self.class_name}:
         def recurse(node_id: int, depth: int) -> str:
             node_indent = ' ' * (indent + depth * 4)
             
-            if tree_struct['children_left'][node_id] == tree_struct['children_right'][node_id]:
+            if is_leaf(
+                tree_struct['feature'], tree_struct['children_left'],
+                tree_struct['children_right'], node_id,
+            ):
                 value = tree_struct['value'][node_id]
                 if self.task_type_ == 'classification':
                     class_id = int(np.argmax(value))

@@ -16,10 +16,12 @@ from typing import Iterable, Optional
 import numpy as np
 
 from .ir import Conjunction, Literal, RuleSet
+from ..tree_constants import TREE_LEAF
 
 
 # Sentinel used by sklearn to mark leaf nodes inside ``Tree.feature``.
-_TREE_LEAF = -2
+# Re-exported for any callers that imported it from this module.
+_TREE_LEAF = TREE_LEAF
 
 
 def from_sklearn_tree(

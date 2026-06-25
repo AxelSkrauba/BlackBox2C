@@ -9,6 +9,8 @@ import numpy as np
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from typing import List, Tuple, Set, Union
 
+from ..tree_constants import TREE_LEAF, TREE_UNDEFINED
+
 
 class RuleOptimizer:
     """
@@ -75,23 +77,36 @@ class RuleOptimizer:
         
         # Identify nodes where both children lead to same class
         for node_id in range(tree_struct.node_count):
-            if tree_struct.feature[node_id] == -2:  # Skip leaves
+            if tree_struct.feature[node_id] == TREE_LEAF:  # Skip leaves
                 continue
-            
+
             left_child = tree_struct.children_left[node_id]
             right_child = tree_struct.children_right[node_id]
-            
+
             # Check if both children are leaves with same prediction
-            if (tree_struct.feature[left_child] == -2 and
-                tree_struct.feature[right_child] == -2):
-                
+            if (tree_struct.feature[left_child] == TREE_LEAF and
+                tree_struct.feature[right_child] == TREE_LEAF):
+
                 left_class = np.argmax(tree_struct.value[left_child][0])
                 right_class = np.argmax(tree_struct.value[right_child][0])
-                
+
                 if left_class == right_class:
-                    # Convert this node to a leaf
-                    # (This is a simplified approach)
-                    tree_struct.feature[node_id] = -2
+                    # Convert this node to a leaf.  All four structural
+                    # attributes must be updated consistently: setting only
+                    # ``feature`` to the leaf sentinel leaves
+                    # ``children_left``/``children_right`` pointing at the
+                    # original (distinct) children, which the platform
+                    # exporters detect as an internal node and emit as
+                    # ``features[-2]`` — an invalid negative array index
+                    # in C (v0.2.0 bug).
+                    tree_struct.value[node_id] = (
+                        tree_struct.value[left_child]
+                        + tree_struct.value[right_child]
+                    )
+                    tree_struct.feature[node_id] = TREE_LEAF
+                    tree_struct.threshold[node_id] = TREE_LEAF
+                    tree_struct.children_left[node_id] = TREE_UNDEFINED
+                    tree_struct.children_right[node_id] = TREE_UNDEFINED
     
     def _merge_similar_leaves(
         self, tree: Union[DecisionTreeClassifier, DecisionTreeRegressor]
@@ -113,15 +128,15 @@ class RuleOptimizer:
             
             for node_id in range(tree_struct.node_count):
                 # Skip leaves
-                if tree_struct.feature[node_id] == -2:
+                if tree_struct.feature[node_id] == TREE_LEAF:
                     continue
-                
+
                 left_child = tree_struct.children_left[node_id]
                 right_child = tree_struct.children_right[node_id]
-                
+
                 # Both children must be leaves
-                if (tree_struct.feature[left_child] == -2 and 
-                    tree_struct.feature[right_child] == -2):
+                if (tree_struct.feature[left_child] == TREE_LEAF and
+                    tree_struct.feature[right_child] == TREE_LEAF):
                     
                     # Get class distributions
                     left_dist = tree_struct.value[left_child][0]
@@ -146,9 +161,15 @@ class RuleOptimizer:
                         if similarity > 0.95:
                             # Combine distributions
                             tree_struct.value[node_id] = np.array([[left_dist + right_dist]])
-                            # Mark as leaf
-                            tree_struct.feature[node_id] = -2
-                            tree_struct.threshold[node_id] = -2
+                            # Mark as leaf — update all structural
+                            # attributes consistently so platform
+                            # exporters (which detect leaves via
+                            # ``children_left == children_right``) treat
+                            # this node as a leaf too.
+                            tree_struct.feature[node_id] = TREE_LEAF
+                            tree_struct.threshold[node_id] = TREE_LEAF
+                            tree_struct.children_left[node_id] = TREE_UNDEFINED
+                            tree_struct.children_right[node_id] = TREE_UNDEFINED
                             changed = True
                             merge_count += 1
         
@@ -168,12 +189,12 @@ class RuleOptimizer:
         tree_struct = tree.tree_
         
         n_nodes = tree_struct.node_count
-        n_leaves = np.sum(tree_struct.feature == -2)
+        n_leaves = np.sum(tree_struct.feature == TREE_LEAF)
         max_depth = tree.get_depth()
-        
+
         # Calculate average path length
         def get_path_lengths(node_id=0, depth=0):
-            if tree_struct.feature[node_id] == -2:
+            if tree_struct.feature[node_id] == TREE_LEAF:
                 return [depth]
             
             left_paths = get_path_lengths(tree_struct.children_left[node_id], depth + 1)

@@ -10,6 +10,8 @@ import numpy as np
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from typing import List, Optional, Tuple, Union
 
+from .tree_constants import TREE_LEAF, is_leaf
+
 
 class CCodeGenerator:
     """
@@ -220,9 +222,11 @@ class CCodeGenerator:
             C code for this subtree.
         """
         indent = " " * (self.indent_size * depth)
-        
-        # Check if leaf node
-        if tree.feature[node_id] == -2:  # Leaf node
+
+        # Check if leaf node.  Use the shared robust detector so a
+        # partially-mutated node (feature == TREE_LEAF but children
+        # not yet cleared) is still treated as a leaf.
+        if is_leaf(tree.feature, tree.children_left, tree.children_right, node_id):
             if self.task_type == 'classification':
                 # Get the predicted class
                 class_counts = tree.value[node_id][0]
@@ -308,7 +312,7 @@ class CCodeGenerator:
             Dictionary with size estimates in bytes.
         """
         n_nodes = tree.tree_.node_count
-        n_leaves = np.sum(tree.tree_.feature == -2)
+        n_leaves = np.sum(tree.tree_.feature == TREE_LEAF)
         n_internal = n_nodes - n_leaves
         
         # Rough estimates
