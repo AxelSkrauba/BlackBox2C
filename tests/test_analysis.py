@@ -13,6 +13,10 @@ from blackbox2c.analysis import FeatureSensitivityAnalyzer, SensitivityResults
 
 class TestFeatureSensitivityAnalyzer:
     """Test FeatureSensitivityAnalyzer class."""
+
+    def test_class_example_includes_feature_names(self):
+        """Test that help() shows report-ready feature labels."""
+        assert "feature_names=feature_names" in FeatureSensitivityAnalyzer.__doc__
     
     @pytest.fixture
     def sample_data(self):

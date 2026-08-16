@@ -27,7 +27,11 @@ converter.convert(
 )
 ```
 
-Run the full pipeline and return generated code.
+Run the full pipeline and return generated code. Decision tree inputs are
+exported directly; other estimators are approximated through a surrogate tree.
+Pass `X_test` to evaluate surrogate fidelity on held-out data. If it is omitted,
+BlackBox2C evaluates on `X_train` and emits a warning because that is not an
+independent estimate.
 
 **Parameters**: same as `convert()` convenience function, minus `config` and `**config_kwargs`.
 
@@ -44,6 +48,8 @@ Returns a `dict` with conversion metrics:
 ```python
 {
     'fidelity': 0.974,              # agreement with original model
+    'fidelity_evaluation_set': 'test',  # 'test', 'train', or 'direct_tree'
+    'fidelity_warning_threshold': 0.95,
     'complexity': {
         'n_nodes': 45,
         'n_leaves': 23,
@@ -54,7 +60,9 @@ Returns a `dict` with conversion metrics:
     'size_estimate': {
         'flash_bytes': 382,         # estimated FLASH usage
         'ram_bytes': 96,            # estimated RAM usage
-    }
+    },
+    'memory_budget_flash_bytes': 1024.0,
+    'memory_budget_met': True,
 }
 ```
 

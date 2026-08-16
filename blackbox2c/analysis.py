@@ -32,7 +32,9 @@ class FeatureSensitivityAnalyzer:
     --------
     >>> from blackbox2c.analysis import FeatureSensitivityAnalyzer
     >>> analyzer = FeatureSensitivityAnalyzer()
-    >>> results = analyzer.analyze(model, X_train, y_train)
+    >>> results = analyzer.analyze(
+    ...     model, X_train, y_train, feature_names=feature_names
+    ... )
     >>> print(results.summary())
     >>> optimal_features = results.get_optimal_subset(threshold=0.01)
     """

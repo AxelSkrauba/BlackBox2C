@@ -23,6 +23,12 @@ with a C compiler, and fits in a few hundred bytes of FLASH.
 3. **Code generation** — The optimized tree is serialized as a pure if-else function in the target
    language.
 
+> **Surrogate fidelity:** DecisionTree inputs are exported directly. Other estimators are approximated
+> by the surrogate tree above, so generated predictions may differ from the original model. Supply
+> `X_test` to measure fidelity on held-out data; without it, BlackBox2C warns that fidelity was
+> measured on `X_train`. Set `fidelity_warning_threshold=None` only when you explicitly want to
+> disable low-fidelity warnings.
+
 ---
 
 ## Supported Models and Targets
@@ -172,8 +178,9 @@ config = ConversionConfig(
     precision=8,             # Bit width for fixed-point: 8 | 16 | 32
     function_name='predict', # Name of the generated function
     n_samples=10000,         # Synthetic samples for surrogate training
+    fidelity_warning_threshold=0.95,  # Warn below this surrogate fidelity
     feature_threshold=None,  # Auto-select N most important features
-    memory_budget_kb=None,   # Auto-tune params to fit a KB budget
+    memory_budget_kb=None,   # Tune small budgets and validate estimated FLASH
 )
 
 converter = Converter(config)
@@ -181,6 +188,10 @@ code = converter.convert(model, X_train, target='arduino')
 metrics = converter.get_metrics()
 # {'fidelity': 0.97, 'complexity': {...}, 'size_estimate': {...}}
 ```
+
+`memory_budget_kb` is checked against the generated code's **estimated FLASH**
+usage after conversion. It remains a heuristic: verify the compiler output on
+your target MCU before treating it as a hardware capacity guarantee.
 
 ### Rule optimization levels
 

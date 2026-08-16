@@ -13,7 +13,7 @@ from .exporters import (
     create_exporter
 )
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 __all__ = [
     'Converter',
     'ConversionConfig',
@@ -40,6 +40,10 @@ def convert(
 ):
     """
     Convenience function to convert a model to embedded code.
+
+    Decision tree inputs are emitted directly. Other estimators are converted
+    through a surrogate decision tree, whose fidelity is measured on X_test
+    when provided and otherwise on X_train.
     
     Parameters
     ----------

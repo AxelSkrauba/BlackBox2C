@@ -19,7 +19,8 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 | `function_name` | `str` | `'predict'` | Name of the generated C/C++ function. |
 | `n_samples` | `int` | `10000` | Number of synthetic samples generated for surrogate training. |
 | `feature_threshold` | `int` | `None` | If set, automatically selects the N most important features before conversion. |
-| `memory_budget_kb` | `float` | `None` | Target memory budget in KB. Auto-adjusts `max_depth`, `precision`, and `use_fixed_point`. |
+| `memory_budget_kb` | `float` | `None` | FLASH budget in KB. Pre-tunes small budgets and warns after conversion if estimated FLASH exceeds it; not a compiled-firmware guarantee. |
+| `fidelity_warning_threshold` | `float` or `None` | `0.95` | Warn when surrogate fidelity is lower. Set to `None` to disable this warning. |
 | `random_state` | `int` | `42` | Random seed for reproducibility. |
 | `include_probabilities` | `bool` | `False` | **Not yet implemented.** Will emit a warning if set to `True`. |
 | `qm_max_literals` | `int` | `12` | *(v0.2)* Cap on unique literals before `'qm'` falls back to identity (with `UserWarning`). |
@@ -28,7 +29,11 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 
 ## Memory Budget Auto-tuning
 
-When `memory_budget_kb` is set, parameters are adjusted automatically:
+When `memory_budget_kb` is set, parameters are adjusted automatically for
+small budgets. After generation, BlackBox2C compares the estimated FLASH bytes
+against `memory_budget_kb * 1024` and emits a `UserWarning` when it is exceeded.
+The estimate is heuristic and does not replace a measurement from the target
+compiler or MCU.
 
 | Budget | Effect |
 |---|---|
