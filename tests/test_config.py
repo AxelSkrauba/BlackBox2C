@@ -73,6 +73,15 @@ class TestConversionConfig:
         config = ConversionConfig(memory_budget_kb=3.0)
         assert config.max_depth <= 6
     
+    def test_fidelity_warning_threshold(self):
+        """Test fidelity warning threshold configuration."""
+        assert ConversionConfig().fidelity_warning_threshold == 0.95
+        assert ConversionConfig(fidelity_warning_threshold=None).fidelity_warning_threshold is None
+        assert ConversionConfig(fidelity_warning_threshold=-0.5).fidelity_warning_threshold == -0.5
+
+        with pytest.raises(ValueError, match="fidelity_warning_threshold"):
+            ConversionConfig(fidelity_warning_threshold=1.1)
+
     def test_bridge_node_limit(self):
         """Test validation of max_bridge_nodes."""
         assert ConversionConfig().max_bridge_nodes == 4096

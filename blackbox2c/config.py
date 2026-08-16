@@ -2,6 +2,7 @@
 Configuration module for BlackBox2C conversion parameters.
 """
 
+import math
 import warnings
 from dataclasses import dataclass
 from typing import Literal, Optional
@@ -81,6 +82,10 @@ class ConversionConfig:
         
     n_samples : int, default=10000
         Number of samples for boundary analysis (for non-tree models).
+
+    fidelity_warning_threshold : Optional[float], default=0.95
+        Emit a warning when surrogate fidelity is below this value. Set to
+        None to disable the low-fidelity warning.
         
     random_state : Optional[int], default=42
         Random seed for reproducibility.
@@ -95,6 +100,7 @@ class ConversionConfig:
     function_name: str = 'predict'
     include_probabilities: bool = False
     n_samples: int = 10000
+    fidelity_warning_threshold: Optional[float] = 0.95
     random_state: Optional[int] = 42
     qm_max_literals: int = 12
     bdd_max_literals: int = 24
@@ -123,6 +129,14 @@ class ConversionConfig:
 
         if self.max_bridge_nodes < 1:
             raise ValueError("max_bridge_nodes must be >= 1")
+
+        if self.fidelity_warning_threshold is not None and (
+            not math.isfinite(self.fidelity_warning_threshold)
+            or self.fidelity_warning_threshold > 1
+        ):
+            raise ValueError(
+                "fidelity_warning_threshold must be finite and <= 1, or None"
+            )
         
         if self.feature_threshold is not None and self.feature_threshold < 1:
             raise ValueError("feature_threshold must be at least 1")

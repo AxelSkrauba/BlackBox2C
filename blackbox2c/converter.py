@@ -78,6 +78,12 @@ class Converter:
     ) -> str:
         """
         Convert a trained model to embedded code.
+
+        DecisionTreeClassifier and DecisionTreeRegressor inputs are emitted
+        directly. Every other estimator is approximated by a surrogate decision
+        tree trained on synthetic boundary samples; ``fidelity`` in the
+        conversion metrics reports agreement between that surrogate and the
+        original model on ``X_test`` when supplied, otherwise on ``X_train``.
         
         Parameters
         ----------
@@ -196,18 +202,42 @@ class Converter:
             print("  Model is already a decision tree, using directly.")
             self.surrogate_tree_ = model
             fidelity = 1.0
+            fidelity_evaluation_set = 'direct_tree'
         else:
             task_type = 'regression' if is_regression else 'classification'
             self.surrogate_tree_ = surrogate_extractor.extract(
                 model_for_surrogate, X_train, self.feature_names_,
                 task_type=task_type
             )
+            fidelity_evaluation_set = 'test' if X_test is not None else 'train'
             fidelity = surrogate_extractor.get_fidelity(
                 model_for_surrogate, X_test if X_test is not None else X_train
             )
             print(f"  Surrogate fidelity: {fidelity:.4f}")
-        
+            if fidelity_evaluation_set == 'train':
+                warnings.warn(
+                    "Surrogate fidelity was evaluated on X_train because no "
+                    "X_test was provided; this is not an independent estimate "
+                    "of deployed-model fidelity.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            threshold = self.config.fidelity_warning_threshold
+            if threshold is not None and fidelity < threshold:
+                warnings.warn(
+                    f"Surrogate fidelity {fidelity:.4f} is below "
+                    f"fidelity_warning_threshold={threshold:.4f}. Consider "
+                    "using X_test, increasing max_depth or n_samples, or "
+                    "reviewing the selected features.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
         self.metrics_['fidelity'] = fidelity
+        self.metrics_['fidelity_evaluation_set'] = fidelity_evaluation_set
+        self.metrics_['fidelity_warning_threshold'] = (
+            self.config.fidelity_warning_threshold
+        )
         
         # Optimize rules
         print("\n[2/4] Optimizing decision rules...")
@@ -321,6 +351,21 @@ class Converter:
             size_estimate = code_generator.estimate_code_size(self.surrogate_tree_)
         print(f"  Estimated FLASH: {size_estimate['flash_bytes']} bytes, RAM: {size_estimate['ram_bytes']} bytes")
         self.metrics_['size_estimate'] = size_estimate
+        if self.config.memory_budget_kb is not None:
+            budget_flash_bytes = self.config.memory_budget_kb * 1024
+            budget_met = size_estimate['flash_bytes'] <= budget_flash_bytes
+            self.metrics_['memory_budget_flash_bytes'] = budget_flash_bytes
+            self.metrics_['memory_budget_met'] = budget_met
+            if not budget_met:
+                warnings.warn(
+                    f"Generated code needs an estimated FLASH size of "
+                    f"{size_estimate['flash_bytes']} bytes, exceeding "
+                    f"memory_budget_kb={self.config.memory_budget_kb:g} "
+                    f"({budget_flash_bytes:g} bytes). This is a heuristic "
+                    "estimate, not a compiled firmware measurement.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         
         print("\n[OK] Conversion complete!")
         
