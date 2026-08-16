@@ -302,6 +302,25 @@ class CCodeGenerator:
  */
 """
     
+    def _reachable_tree_shape(self, tree) -> Tuple[int, int]:
+        stack = [0]
+        n_internal = 0
+        n_leaves = 0
+
+        while stack:
+            node_id = stack.pop()
+            if is_leaf(
+                tree.feature, tree.children_left, tree.children_right, node_id
+            ):
+                n_leaves += 1
+                continue
+
+            n_internal += 1
+            stack.append(tree.children_right[node_id])
+            stack.append(tree.children_left[node_id])
+
+        return n_internal, n_leaves
+
     def estimate_code_size(self, tree: DecisionTreeClassifier) -> dict:
         """
         Estimate the size of generated code.
@@ -311,9 +330,8 @@ class CCodeGenerator:
         dict
             Dictionary with size estimates in bytes.
         """
-        n_nodes = tree.tree_.node_count
-        n_leaves = np.sum(tree.tree_.feature == TREE_LEAF)
-        n_internal = n_nodes - n_leaves
+        n_internal, n_leaves = self._reachable_tree_shape(tree.tree_)
+        n_nodes = n_internal + n_leaves
         
         # Rough estimates
         bytes_per_condition = 12  # if statement
