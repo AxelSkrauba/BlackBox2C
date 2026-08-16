@@ -19,6 +19,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.3] - 2026-08-18
+
+Transparency and deployment-budget release for surrogate conversions.
+
+### Added
+
+- **Configurable fidelity warnings**: `fidelity_warning_threshold` defaults
+  to `0.95`; set it to `None` to disable only the low-fidelity warning.
+  Conversion now reports whether fidelity was evaluated on `X_test`,
+  `X_train`, or a directly exported decision tree.
+- **FLASH budget validation**: `memory_budget_kb` now records
+  `memory_budget_flash_bytes` and `memory_budget_met`, then emits a
+  non-blocking warning when the estimated FLASH size exceeds the budget.
+
+### Changed
+
+- Non-tree conversions now warn when no `X_test` is supplied because
+  fidelity measured on `X_train` is not an independent estimate.
+- Conversion docstrings and API documentation explicitly describe the
+  surrogate-tree mechanism and its fidelity trade-off.
+- The `FeatureSensitivityAnalyzer` class example now passes
+  `feature_names`, matching the method-level example and producing
+  reusable feature labels in reports.
+- Documentation clarifies that `memory_budget_kb` uses heuristic FLASH
+  estimates, not compiled firmware or target-MCU measurements.
+
+---
+
 ## [0.2.2] - 2026-08-15
 
 Safety and metrics release for the advanced optimisation pipeline.
