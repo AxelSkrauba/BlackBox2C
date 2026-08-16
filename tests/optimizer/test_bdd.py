@@ -232,6 +232,19 @@ class TestFallback:
             opt = BDDOptimizer(max_literals=4).minimize(rs)
         assert opt is rs
 
+    def test_max_states_fallback(self):
+        rs = RuleSet(
+            rules=(
+                Conjunction((Literal(0, 0.0, "<="),), 0),
+                Conjunction((Literal(0, 0.0, ">"),), 1),
+            ),
+            n_features=1,
+            n_classes=2,
+        )
+        with pytest.warns(UserWarning, match="max_bdd_states"):
+            out = BDDOptimizer(max_bdd_states=1).minimize(rs)
+        assert out is rs
+
     def test_single_leaf_is_noop(self):
         rs = RuleSet(
             rules=(Conjunction((), prediction=0),),

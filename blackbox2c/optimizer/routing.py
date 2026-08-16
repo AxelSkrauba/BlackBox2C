@@ -134,17 +134,42 @@ def _auto_route(
     Lazy-imported to avoid a circular dependency between
     :mod:`routing` and :mod:`codegen_bridge`.
     """
+    from ..codegen_bridge import RuleSetExpansionLimitError
+
+    if n_lits > qm_max_literals and n_lits > bdd_max_literals:
+        warnings.warn(
+            f"optimize_rules='auto' could not pick QM or BDD: "
+            f"{n_lits} unique literals exceed both "
+            f"qm_max_literals={qm_max_literals} and "
+            f"bdd_max_literals={bdd_max_literals}. Returning the RuleSet "
+            "unchanged; consider reducing max_depth or using "
+            "feature_threshold before increasing optimizer caps.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return rs
+
     # Baseline: emit the input RuleSet as-is.
     candidates: list[tuple[int, str, RuleSet]] = []
-    baseline_size = _estimate_size(rs)
+    try:
+        baseline_size = _estimate_size(rs)
+    except RuleSetExpansionLimitError:
+        warnings.warn(
+            "optimize_rules='auto' skipped advanced optimization because "
+            "baseline RuleSet reconstruction exceeded its safety limit. "
+            "Returning the RuleSet unchanged.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return rs
     candidates.append((baseline_size, "noop", rs))
 
     if n_lits <= qm_max_literals:
         qm_rs = QMOptimizer(max_literals=qm_max_literals).minimize(rs)
-        candidates.append((_estimate_size(qm_rs), "qm", qm_rs))
+        _append_candidate(candidates, "qm", qm_rs, RuleSetExpansionLimitError)
     if n_lits <= bdd_max_literals:
         bdd_rs = BDDOptimizer(max_literals=bdd_max_literals).minimize(rs)
-        candidates.append((_estimate_size(bdd_rs), "bdd", bdd_rs))
+        _append_candidate(candidates, "bdd", bdd_rs, RuleSetExpansionLimitError)
 
     # Stable: ties broken by insertion order (noop, qm, bdd).
     best_size, best_name, best_rs = min(candidates, key=lambda c: c[0])
@@ -154,20 +179,19 @@ def _auto_route(
         n_lits, best_name, best_size,
     )
 
-    if best_name == "noop" and not (
-        n_lits <= qm_max_literals or n_lits <= bdd_max_literals
-    ):
+    return best_rs
+
+
+def _append_candidate(candidates, name: str, ruleset: RuleSet, limit_error) -> None:
+    try:
+        candidates.append((_estimate_size(ruleset), name, ruleset))
+    except limit_error:
         warnings.warn(
-            f"optimize_rules='auto' could not pick QM or BDD: "
-            f"{n_lits} unique literals exceed both "
-            f"qm_max_literals={qm_max_literals} and "
-            f"bdd_max_literals={bdd_max_literals}.  Returning the "
-            "RuleSet unchanged; the upstream legacy 'high' pruning "
-            "still applies.",
+            f"optimize_rules='auto' skipped {name} because RuleSet "
+            "reconstruction exceeded its safety limit.",
             UserWarning,
             stacklevel=3,
         )
-    return best_rs
 
 
 def _estimate_size(rs: RuleSet) -> int:

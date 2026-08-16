@@ -45,6 +45,11 @@ from .ir import Conjunction, Literal, RuleSet
 
 DEFAULT_MAX_LITERALS: int = 24
 DEFAULT_MAX_BDD_NODES: int = 200_000
+DEFAULT_MAX_BDD_STATES: int = 8_192
+
+
+class BDDComplexityLimitError(RuntimeError):
+    """Raised when BDD construction exceeds its bounded search state limit."""
 
 
 # A BDD variable is identified by its (feature_idx, threshold) pair.
@@ -91,7 +96,7 @@ class _BDD:
         return node_id
 
     # ── Construction from a Boolean function ───────────────────────
-    def build(self, evaluate) -> int:
+    def build(self, evaluate, max_states: int = DEFAULT_MAX_BDD_STATES) -> int:
         """Build the BDD recursively in the order ``self.var_order``.
 
         ``evaluate(assignment)`` is a callable that takes a dict
@@ -109,6 +114,10 @@ class _BDD:
             key = frozenset(assignment.items())
             if key in memo:
                 return memo[key]
+            if len(memo) >= max_states:
+                raise BDDComplexityLimitError(
+                    f"BDD construction exceeds max_bdd_states={max_states}"
+                )
             if level == len(self.var_order):
                 value = evaluate(
                     {self.var_order[i]: v for i, v in assignment.items()}
@@ -171,10 +180,13 @@ class BDDOptimizer:
     max_bdd_nodes : int, default 200_000
         Soft ceiling on the size of the constructed BDD; if exceeded
         during the build we abort and return the input RuleSet.
+    max_bdd_states : int, default 8_192
+        Maximum memoized assignment states explored during BDD construction.
     """
 
     max_literals: int = DEFAULT_MAX_LITERALS
     max_bdd_nodes: int = DEFAULT_MAX_BDD_NODES
+    max_bdd_states: int = DEFAULT_MAX_BDD_STATES
     last_diagnostics_: Dict[str, object] = field(default_factory=dict)
 
     def minimize(self, rs: RuleSet) -> RuleSet:
@@ -214,7 +226,22 @@ class BDDOptimizer:
         bdds: List[Tuple[_BDD, int]] = []
         for c in range(rs.n_classes):
             bdd = _BDD(var_order=var_order)
-            root = bdd.build(_class_indicator(rs, c, var_order))
+            try:
+                root = bdd.build(
+                    _class_indicator(rs, c, var_order), self.max_bdd_states
+                )
+            except BDDComplexityLimitError:
+                warnings.warn(
+                    f"BDDOptimizer: construction for class {c} exceeded "
+                    f"max_bdd_states={self.max_bdd_states}; aborting.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                self.last_diagnostics_ = {
+                    "n_literals": n_lits, "applied": False,
+                    "reason": "max_bdd_states_exceeded",
+                }
+                return rs
             if bdd.n_internal_nodes > self.max_bdd_nodes:
                 warnings.warn(
                     f"BDDOptimizer: BDD for class {c} reached "

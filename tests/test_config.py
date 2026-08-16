@@ -73,6 +73,14 @@ class TestConversionConfig:
         config = ConversionConfig(memory_budget_kb=3.0)
         assert config.max_depth <= 6
     
+    def test_bridge_node_limit(self):
+        """Test validation of max_bridge_nodes."""
+        assert ConversionConfig().max_bridge_nodes == 4096
+        assert ConversionConfig(max_bridge_nodes=12).max_bridge_nodes == 12
+
+        with pytest.raises(ValueError, match="max_bridge_nodes"):
+            ConversionConfig(max_bridge_nodes=0)
+
     def test_invalid_memory_budget(self):
         """Test validation of memory_budget_kb parameter."""
         with pytest.raises(ValueError, match="memory_budget_kb must be positive"):

@@ -42,8 +42,21 @@ from .codegen import CCodeGenerator
 from .optimizer.ir import Conjunction, Literal, RuleSet
 
 
+DEFAULT_MAX_BRIDGE_NODES = 4096
+
+
+class RuleSetExpansionLimitError(RuntimeError):
+    """Raised when RuleSet reconstruction exceeds its safe complexity limit."""
+
+
 class RuleSetCodeGenerator(CCodeGenerator):
     """Emit embedded C code directly from a :class:`RuleSet`."""
+
+    def __init__(self, *args, max_bridge_nodes: int = DEFAULT_MAX_BRIDGE_NODES, **kwargs):
+        super().__init__(*args, **kwargs)
+        if max_bridge_nodes < 1:
+            raise ValueError("max_bridge_nodes must be >= 1")
+        self.max_bridge_nodes = max_bridge_nodes
 
     # ── public API ────────────────────────────────────────────────
     def generate_from_ruleset(
@@ -128,6 +141,7 @@ class RuleSetCodeGenerator(CCodeGenerator):
 
     # ── private helpers ───────────────────────────────────────────
     def _generate_ruleset_body(self, rs: RuleSet) -> str:
+        self._tree_shape(list(rs.rules))
         return self._emit_tree(list(rs.rules), depth=1, fallback=self._fallback_prediction(rs))
 
     def _fallback_prediction(self, rs: RuleSet):
@@ -193,7 +207,10 @@ class RuleSetCodeGenerator(CCodeGenerator):
 
     @staticmethod
     def _partition(
-        rules: List[Conjunction], f_idx: int, threshold: float
+        rules: List[Conjunction],
+        f_idx: int,
+        threshold: float,
+        max_rules: Optional[int] = None,
     ) -> Tuple[List[Conjunction], List[Conjunction]]:
         """Split ``rules`` into the ``<=`` and ``>`` branches.
 
@@ -229,20 +246,44 @@ class RuleSetCodeGenerator(CCodeGenerator):
             )
             new_rule = Conjunction(stripped, r.prediction)
             if has_le and not has_gt:
+                if max_rules is not None and len(yes) >= max_rules:
+                    raise RuleSetExpansionLimitError(
+                        "RuleSet reconstruction exceeded the branch rule limit"
+                    )
                 yes.append(new_rule)
             elif has_gt and not has_le:
+                if max_rules is not None and len(no) >= max_rules:
+                    raise RuleSetExpansionLimitError(
+                        "RuleSet reconstruction exceeded the branch rule limit"
+                    )
                 no.append(new_rule)
             else:
                 # Either neutral (no literal on this pair) or
                 # contradictory (both <= and >; cannot fire — drop).
-                if not (has_le and has_gt):
-                    yes.append(new_rule)
-                    no.append(new_rule)
+                if has_le and has_gt:
+                    continue
+                if max_rules is not None and (
+                    len(yes) >= max_rules or len(no) >= max_rules
+                ):
+                    raise RuleSetExpansionLimitError(
+                        "RuleSet reconstruction exceeded the branch rule limit"
+                    )
+                yes.append(new_rule)
+                no.append(new_rule)
         return yes, no
 
     def _tree_shape(self, rules: List[Conjunction]) -> Tuple[int, int]:
-        """Count (internal_nodes, leaves) of the reconstructed tree
-        without actually generating the C source."""
+        budget = [self.max_bridge_nodes]
+        return self._count_tree_shape(rules, budget)
+
+    def _count_tree_shape(
+        self, rules: List[Conjunction], budget: List[int]
+    ) -> Tuple[int, int]:
+        if budget[0] < 1:
+            raise RuleSetExpansionLimitError(
+                f"RuleSet reconstruction exceeds max_bridge_nodes={self.max_bridge_nodes}"
+            )
+        budget[0] -= 1
         if not rules:
             return 0, 1
         for r in rules:
@@ -253,9 +294,11 @@ class RuleSetCodeGenerator(CCodeGenerator):
         pivot = self._pick_pivot(rules)
         if pivot is None:
             return 0, 1
-        yes_rules, no_rules = self._partition(rules, pivot[0], pivot[1])
-        l_int, l_leaf = self._tree_shape(yes_rules)
-        r_int, r_leaf = self._tree_shape(no_rules)
+        yes_rules, no_rules = self._partition(
+            rules, pivot[0], pivot[1], max_rules=self.max_bridge_nodes
+        )
+        l_int, l_leaf = self._count_tree_shape(yes_rules, budget)
+        r_int, r_leaf = self._count_tree_shape(no_rules, budget)
         return 1 + l_int + r_int, l_leaf + r_leaf
 
     def _format_threshold(self, threshold: float) -> str:

@@ -23,6 +23,7 @@ These tests pin three things:
 """
 
 import re
+import warnings
 
 import numpy as np
 import pytest
@@ -108,19 +109,11 @@ class TestPruneNegativeIndexBug:
         )
 
     @pytest.mark.parametrize("target", ["c", "cpp", "arduino", "micropython"])
-    @pytest.mark.parametrize("level", ["medium", "high"])
+    @pytest.mark.parametrize("level", ["medium", "high", "auto"])
     def test_all_targets_all_levels_no_negative_index(
         self, iris_rf_surrogate, target, level
     ):
-        """No target × level combination may emit a negative index.
-
-        ``auto`` is excluded from this matrix because the v0.2.0
-        ``codegen_bridge._tree_shape`` / ``_emit_tree`` recursors
-        explode exponentially when many rules are neutral to the
-        chosen pivot literal (a pre-existing bug unrelated to the
-        ``features[-2]`` fix — see ``test_auto_small_tree`` below for
-        ``auto`` coverage with a tree small enough not to trigger it).
-        """
+        """No target × level combination may emit a negative index."""
         tree, X = iris_rf_surrogate
 
         config = ConversionConfig(
@@ -130,50 +123,17 @@ class TestPruneNegativeIndexBug:
             function_name='predict',
         )
         conv = Converter(config)
-        code = conv.convert(
-            tree, X,
-            target=target,
-            feature_names=['feat0', 'feat1', 'feat2'],
-            class_names=['setosa', 'versicolor', 'virginica'],
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            code = conv.convert(
+                tree, X,
+                target=target,
+                feature_names=['feat0', 'feat1', 'feat2'],
+                class_names=['setosa', 'versicolor', 'virginica'],
+            )
         assert not _has_negative_index(code), (
             f"Negative feature index for target={target!r}, "
             f"level={level!r}.\n" + code[:800]
-        )
-
-    @pytest.mark.parametrize("target", ["c", "cpp", "arduino", "micropython"])
-    def test_auto_small_tree_no_negative_index(self, target):
-        """``auto`` must not emit negative indices.
-
-        Uses a small depth-3 tree (4 unique literals) so the
-        ``codegen_bridge._tree_shape`` / ``_emit_tree`` recursors —
-        which explode exponentially on large neutral-rule sets (a
-        pre-existing v0.2.0 bug, not the ``features[-2]`` issue) —
-        stay tractable.  This still exercises the full ``auto``
-        pipeline: legacy medium pruning → IR extraction →
-        ``_auto_route`` → bridge/exporter codegen.
-        """
-        iris = load_iris()
-        X = iris.data[:, :3]
-        y = iris.target
-        tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X, y)
-
-        config = ConversionConfig(
-            max_depth=3,
-            optimize_rules='auto',
-            n_samples=5000,
-            function_name='predict',
-        )
-        conv = Converter(config)
-        code = conv.convert(
-            tree, X,
-            target=target,
-            feature_names=['feat0', 'feat1', 'feat2'],
-            class_names=['setosa', 'versicolor', 'virginica'],
-        )
-        assert not _has_negative_index(code), (
-            f"Negative feature index for target={target!r}, level='auto'.\n"
-            + code[:800]
         )
 
     # ── structural consistency ────────────────────────────────────────

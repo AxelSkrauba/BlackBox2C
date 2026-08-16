@@ -12,7 +12,7 @@ import warnings
 from .config import ConversionConfig
 from .surrogate import SurrogateExtractor
 from .codegen import CCodeGenerator
-from .codegen_bridge import RuleSetCodeGenerator
+from .codegen_bridge import RuleSetCodeGenerator, RuleSetExpansionLimitError
 from .optimizer import RuleOptimizer
 from .optimizer.extraction import from_sklearn_tree
 from .optimizer.routing import is_advanced_level, optimize_ruleset
@@ -246,9 +246,12 @@ class Converter:
                     qm_max_literals=self.config.qm_max_literals,
                     bdd_max_literals=self.config.bdd_max_literals,
                 )
-                self.optimized_ruleset_ = rs_out
                 self.metrics_['ruleset_n_rules_in'] = len(rs_in.rules)
                 self.metrics_['ruleset_n_rules_out'] = len(rs_out.rules)
+                self.metrics_['advanced_optimizer_applied'] = rs_out is not rs_in
+                self.metrics_['advanced_optimizer_fallback'] = rs_out is rs_in
+                if rs_out is not rs_in:
+                    self.optimized_ruleset_ = rs_out
                 print(
                     f"  RuleSet rules: {len(rs_in.rules)} -> "
                     f"{len(rs_out.rules)}"
@@ -268,12 +271,33 @@ class Converter:
                 use_fixed_point=self.config.use_fixed_point,
                 precision=self.config.precision,
                 optimize_rules=self.config.optimize_rules,
+                max_bridge_nodes=self.config.max_bridge_nodes,
             )
-            c_code = code_generator.generate_from_ruleset(
-                self.optimized_ruleset_,
-                self.feature_names_,
-                self.class_names_,
-            )
+            try:
+                c_code = code_generator.generate_from_ruleset(
+                    self.optimized_ruleset_,
+                    self.feature_names_,
+                    self.class_names_,
+                )
+            except RuleSetExpansionLimitError:
+                warnings.warn(
+                    "Advanced RuleSet code generation exceeded max_bridge_nodes; "
+                    "falling back to the legacy tree code generator.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                self.optimized_ruleset_ = None
+                self.metrics_['advanced_optimizer_applied'] = False
+                self.metrics_['advanced_optimizer_fallback'] = True
+                code_generator = CCodeGenerator(
+                    function_name=self.config.function_name,
+                    use_fixed_point=self.config.use_fixed_point,
+                    precision=self.config.precision,
+                    optimize_rules=self.config.optimize_rules,
+                )
+                c_code = code_generator.generate(
+                    self.surrogate_tree_, self.feature_names_, self.class_names_
+                )
         else:
             code_generator = CCodeGenerator(
                 function_name=self.config.function_name,

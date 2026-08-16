@@ -51,6 +51,10 @@ class ConversionConfig:
 
     bdd_max_literals : int, default=24
         Same as ``qm_max_literals`` but for the BDD optimizer.
+
+    max_bridge_nodes : int, default=4096
+        Maximum number of nodes reconstructed by advanced RuleSet code
+        generation before conversion falls back to the legacy tree path.
         
     feature_threshold : Optional[int], default=None
         Maximum number of features to use after automatic selection.
@@ -94,6 +98,7 @@ class ConversionConfig:
     random_state: Optional[int] = 42
     qm_max_literals: int = 12
     bdd_max_literals: int = 24
+    max_bridge_nodes: int = 4096
     
     def __post_init__(self):
         """Validate configuration parameters."""
@@ -115,6 +120,9 @@ class ConversionConfig:
 
         if self.bdd_max_literals < 0:
             raise ValueError("bdd_max_literals must be >= 0")
+
+        if self.max_bridge_nodes < 1:
+            raise ValueError("max_bridge_nodes must be >= 1")
         
         if self.feature_threshold is not None and self.feature_threshold < 1:
             raise ValueError("feature_threshold must be at least 1")
