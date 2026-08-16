@@ -23,7 +23,8 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 | `random_state` | `int` | `42` | Random seed for reproducibility. |
 | `include_probabilities` | `bool` | `False` | **Not yet implemented.** Will emit a warning if set to `True`. |
 | `qm_max_literals` | `int` | `12` | *(v0.2)* Cap on unique literals before `'qm'` falls back to identity (with `UserWarning`). |
-| `bdd_max_literals` | `int` | `20` | *(v0.2)* Cap on unique literals before `'bdd'` falls back to identity (with `UserWarning`). |
+| `bdd_max_literals` | `int` | `24` | *(v0.2)* Cap on unique literals before `'bdd'` falls back to identity (with `UserWarning`). |
+| `max_bridge_nodes` | `int` | `4096` | Maximum advanced RuleSet reconstruction nodes before safe fallback to the legacy tree path. |
 
 ## Memory Budget Auto-tuning
 
@@ -42,7 +43,10 @@ When `memory_budget_kb` is set, parameters are adjusted automatically:
 - Legacy levels (`'low'`, `'medium'`, `'high'`) keep their exact v0.1 semantics and
   produce **byte-identical** C code.
 - Functional equivalence with the surrogate tree is verified at 100 % by the test
-  suite (293 tests).
+  suite.
+- Inputs above both literal caps, or RuleSets that exceed `max_bridge_nodes` during
+  reconstruction, emit a `UserWarning` and use the legacy tree path without changing
+  predictions.
 - See [`benchmarks/results/v0.2.md`](https://github.com/AxelSkrauba/BlackBox2C/blob/main/benchmarks/results/v0.2.md)
   for measured FLASH savings and the [Optimizer (advanced)](optimizer.md) reference
   for direct programmatic access to QM, BDD, and the routing layer.

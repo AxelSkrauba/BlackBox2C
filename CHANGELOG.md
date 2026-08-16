@@ -19,6 +19,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-08-15
+
+Safety and metrics release for the advanced optimisation pipeline.
+
+### Fixed
+
+- **Bounded advanced reconstruction**: `RuleSetCodeGenerator` now enforces
+  `max_bridge_nodes` (default: 4096) while reconstructing a hierarchical
+  C tree. RuleSets whose neutral rules would expand exponentially now
+  fall back safely to the legacy surrogate tree with a `UserWarning`
+  instead of consuming unbounded RAM.
+- **Safe `auto` routing**: when both QM and BDD literal caps reject an
+  input, `auto` now returns the baseline RuleSet before bridge size
+  estimation. This prevents the previous `_tree_shape` expansion from
+  running even though no advanced candidate could be selected.
+- **Bounded BDD construction**: BDD optimisation now limits memoized
+  assignment states (default: 8192) during construction. The former
+  `max_bdd_nodes` check happened only after exhaustive construction,
+  allowing high-literal inputs to consume excessive memory first.
+- **No-op advanced fallbacks use legacy codegen**: QM, BDD and `auto`
+  now retain the tree-based generator when the optimiser returns its
+  input unchanged. This avoids needless DNF reconstruction and makes
+  fallback emission match the legacy path.
+- **Reachable size estimates**: `CCodeGenerator.estimate_code_size()`
+  now counts only nodes reachable from the tree root. This excludes
+  descendants retained in sklearn's internal arrays after pruning and
+  aligns `Estimated FLASH` with the C code actually emitted.
+
+### Added
+
+- `ConversionConfig.max_bridge_nodes` to control the maximum safe size
+  of advanced RuleSet-to-tree reconstruction.
+- Metrics `advanced_optimizer_applied` and `advanced_optimizer_fallback`
+  for classification conversions that request an advanced optimisation
+  level.
+
+---
+
 ## [0.2.1] - 2026-06-25
 
 Bugfix release.  Resolves the ``features[-2]`` issue reported against

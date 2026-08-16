@@ -87,7 +87,7 @@ over-cap inputs return unchanged with a `UserWarning`.
 
 One ROBDD per output class is built with frequency-ordered variables and a unique
 table. Re-emission enumerates true-paths back into a `RuleSet`. Capped by
-`bdd_max_literals` (default 20).
+`bdd_max_literals` (default 24) and a bounded assignment-state search.
 
 ### Auto Routing (`'auto'`, v0.2)
 

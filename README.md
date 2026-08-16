@@ -167,6 +167,7 @@ config = ConversionConfig(
     optimize_rules='medium', # 'low' | 'medium' | 'high' | 'qm' | 'bdd' | 'auto'
     qm_max_literals=12,      # Hard cap on literals processed by QM (v0.2+)
     bdd_max_literals=24,     # Hard cap on literals processed by BDD (v0.2+)
+    max_bridge_nodes=4096,   # Safe cap for advanced C reconstruction
     use_fixed_point=False,   # Use integer arithmetic instead of float
     precision=8,             # Bit width for fixed-point: 8 | 16 | 32
     function_name='predict', # Name of the generated function
@@ -190,12 +191,14 @@ metrics = converter.get_metrics()
 | `high`   | `medium` + merge sibling leaves with very similar class distributions.                      | Backward-compatible with v0.1.                                   |
 | `qm`     | Multi-valued **Quine-McCluskey** boolean minimisation lifted to continuous splits. *(v0.2)* | Classification only. Capped by `qm_max_literals`.                |
 | `bdd`    | Frequency-ordered **Reduced Ordered BDD** rebuilt as a tree. *(v0.2)*                       | Classification only. Capped by `bdd_max_literals`.               |
-| `auto`   | Runs every applicable optimiser plus the no-op baseline; returns the smallest. *(v0.2)*     | Recommended default if you only care about code size.            |
+| `auto`   | Runs every applicable optimiser plus the no-op baseline; returns the smallest. *(v0.2)*     | Falls back safely if caps or bridge limits prevent reconstruction. |
 
 Advanced levels (`qm`, `bdd`, `auto`) preserve **100 % functional
 equivalence** with the surrogate tree (verified by the test suite).
 On regression they emit a single `UserWarning` and fall back to the
-legacy `'high'` path.  Best-case savings on the benchmark
+legacy `'high'` path. If a literal cap or `max_bridge_nodes` prevents
+safe advanced reconstruction, conversion falls back to the legacy tree
+path without changing predictions. Best-case savings on the benchmark
 ([`benchmarks/results/v0.2.md`](benchmarks/results/v0.2.md)): **−47 % FLASH** on Iris +
 RandomForest.  See [`notebooks/07_advanced_optimization.ipynb`](notebooks/07_advanced_optimization.ipynb)
 for a guided walkthrough.
