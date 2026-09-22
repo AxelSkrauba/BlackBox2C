@@ -1,252 +1,208 @@
-# Tests - BlackBox2C
+# BlackBox2C - Test Suite
 
-## Estructura de Tests
+**326 tests · 93% coverage · 100% passing** *(reference: v0.2.3)*
+
+[![Tests](https://github.com/AxelSkrauba/BlackBox2C/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelSkrauba/BlackBox2C/actions)
+
+---
+
+## Test Suite Layout
 
 ```
 tests/
-├── __init__.py              # Inicialización del paquete de tests
-├── test_analysis.py         # Tests de análisis de features (19 tests)
-├── test_codegen.py          # Tests de generación de código (10 tests)
-├── test_config.py           # Tests de configuración (7 tests)
-├── test_converter.py        # Tests de integración (14 tests)
-├── test_exporters.py        # Tests de exportadores multi-formato (40 tests)
-├── test_optimizer.py        # Tests de optimización (9 tests)
-├── test_regression.py       # Tests de regresión (16 tests)
-├── test_reproducibility.py  # Tests de reproducibilidad (6 tests)
-├── test_surrogate.py        # Tests de extracción de surrogate (7 tests)
-└── README.md               # Este archivo
+├── __init__.py                    # Test package initialization
+├── test_advanced_fallbacks.py     # Safe fallbacks for advanced optimizers (6 tests)
+├── test_analysis.py               # Feature sensitivity analysis (20 tests)
+├── test_cli.py                    # Command-line interface (19 tests)
+├── test_codegen.py                # C code generation (25 tests)
+├── test_config.py                 # ConversionConfig validation (9 tests)
+├── test_conversion_warnings.py    # Fidelity / FLASH budget warnings (5 tests)
+├── test_converter.py              # Converter end-to-end integration (14 tests)
+├── test_exporters.py              # C++, Arduino, MicroPython exporters (40 tests)
+├── test_optimizer.py              # Legacy rule optimization (9 tests)
+├── test_prune_negative_index_bug.py  # Regression suite: features[-2] prune bug (18 tests)
+├── test_regression.py             # Regression task conversion (16 tests)
+├── test_reproducibility.py        # Reproducibility across runs (6 tests)
+├── test_surrogate.py              # Surrogate tree extraction (7 tests)
+├── test_target_param.py           # target= parameter behavior (20 tests)
+├── optimizer/                     # Advanced optimization pipeline (v0.2)
+│   ├── test_bdd.py                # Reduced Ordered BDD optimizer (17 tests)
+│   ├── test_extraction.py         # Rule extraction from sklearn trees (15 tests)
+│   ├── test_integration.py        # End-to-end advanced pipeline (18 tests)
+│   ├── test_ir.py                 # Intermediate representation (17 tests)
+│   ├── test_qm.py                 # Quine-McCluskey minimisation (20 tests)
+│   ├── test_routing.py            # Optimizer routing and size estimation (14 tests)
+│   └── test_simplify.py           # Boolean simplification primitives (11 tests)
+└── README.md                      # This file
 ```
 
-## Estadísticas
+## Statistics
 
-- **Total de tests**: 128
-- **Estado**: 100% pasando ✅
-- **Cobertura**: ~90%
-- **Tiempo de ejecución**: ~1.5s
+| Metric | Value |
+|---|---|
+| Total tests | **326** |
+| Status | 100% passing |
+| Coverage | **93%** (1734 statements, 126 missed) |
+| Runtime | ~24 s (full suite) |
+| Reference version | v0.2.3 |
 
-## Ejecutar Tests
+> Figures above were measured with `pytest --cov` on the reference version. Counts
+> drift as the suite grows — re-run `pytest --collect-only -q` to refresh them.
 
-### Instalar pytest
+---
+
+## Running Tests
+
+### Install dev dependencies
 
 ```bash
-pip install pytest pytest-cov
+# From the project root (canonical install, includes pytest + pytest-cov)
+pip install -e ".[dev]"
 ```
 
-### Ejecutar todos los tests
+> **Tip:** Use a dedicated virtual environment (e.g. `python -m venv .venv`) rather
+> than your global interpreter.
+
+### Run all tests
 
 ```bash
-# Desde el directorio raíz del proyecto
-pytest tests/
+# From the project root (paths are configured in pyproject.toml)
+pytest
 
-# Con verbose
-pytest tests/ -v
-
-# Con cobertura
-pytest tests/ --cov=blackbox2c --cov-report=html
+# With coverage
+pytest tests/ --cov=blackbox2c --cov-report=term
 ```
 
-### Ejecutar tests específicos
+### Run specific tests
 
 ```bash
-# Un archivo específico
-pytest tests/test_config.py
+# A single module
+pytest tests/test_config.py -vv
 
-# Una clase específica
+# A specific class
 pytest tests/test_config.py::TestConversionConfig
 
-# Un test específico
+# A single test
 pytest tests/test_config.py::TestConversionConfig::test_default_config
 ```
 
-## Cobertura de Tests
+---
 
-### Módulos Cubiertos
+## Coverage Map
 
-- **test_config.py**: Configuración y validación de parámetros
-  - Valores por defecto
-  - Valores personalizados
-  - Validación de parámetros inválidos
-  - Ajuste automático por presupuesto de memoria
+| Module | Coverage | Notes |
+|---|---|---|
+| `exporters.py` | 99% | C++, Arduino, MicroPython exporters |
+| `tree_constants.py` | 100% | Shared leaf-detection constants |
+| `optimizer/extraction.py` | 100% | Rule extraction from sklearn trees |
+| `optimizer/ir.py` | 99% | Intermediate representation |
+| `codegen.py` | 96% | C code generation |
+| `optimizer/legacy.py` | 96% | Legacy pruning / merging |
+| `optimizer/bdd.py` | 95% | BDD optimiser |
+| `optimizer/qm.py` | 94% | Quine-McCluskey optimiser |
+| `optimizer/routing.py` | 92% | Optimizer routing and auto-selection |
+| `surrogate.py` | 97% | Surrogate tree extraction |
+| `codegen_bridge.py` | 84% | RuleSet → hierarchical C bridge |
+| `converter.py` | 90% | Main orchestration pipeline |
+| `cli.py` | 87% | Command-line interface |
+| `analysis.py` | 77% | Feature sensitivity analysis |
+| **TOTAL** | **93%** | |
 
-- **test_surrogate.py**: Extracción de modelos surrogate
-  - Inicialización
-  - Extracción desde Random Forest
-  - Extracción desde SVM
-  - Cálculo de fidelidad
-  - Generación de muestras de frontera
+---
 
-- **test_optimizer.py**: Optimización de reglas
-  - Niveles de optimización (low, medium, high)
-  - Poda de ramas redundantes
-  - Fusión de hojas similares
-  - Análisis de complejidad
-  - Importancia de features
+## CI
 
-- **test_codegen.py**: Generación de código C
-  - Generación básica
-  - Punto flotante vs punto fijo
-  - Diferentes precisiones (8, 16, 32 bits)
-  - Estimación de tamaño
-  - Nombres personalizados
+Tests run automatically on every push to `main`/`develop` and on PRs against `main`
+via [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
-- **test_converter.py**: Integración end-to-end
-  - Conversión de diferentes modelos
-  - Validación de entrada
-  - Manejo de errores
-  - Recolección de métricas
+- **Matrix**: Python 3.8, 3.9, 3.10, 3.11, 3.12 (ubuntu-latest)
+- **Install**: `pip install -e ".[dev]"`
+- **Run**: `pytest tests/ --tb=short -q`
+- **Coverage**: collected on Python 3.11 and uploaded to Codecov
 
-- **test_reproducibility.py**: Tests de reproducibilidad (software regression)
-  - Fidelidad consistente
-  - Tamaño de código razonable
-  - Reproducibilidad con mismo random_state
-  - Diferentes configuraciones
+[![Tests](https://github.com/AxelSkrauba/BlackBox2C/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelSkrauba/BlackBox2C/actions)
 
-## Métricas de Éxito
+---
 
-### Criterios de Aceptación
+## Writing New Tests
 
-✅ **Todos los tests pasan**: 100% de tests exitosos  
-✅ **Cobertura >80%**: Al menos 80% del código cubierto  
-✅ **Sin warnings**: No hay warnings de pytest  
-✅ **Tiempo razonable**: Suite completa <30 segundos  
-
-### Resultados Esperados
-
-```
-tests/test_config.py ............          [ 15%]
-tests/test_surrogate.py .........          [ 30%]
-tests/test_optimizer.py ..........         [ 45%]
-tests/test_codegen.py ............         [ 60%]
-tests/test_converter.py ..............     [ 80%]
-tests/test_regression.py .......           [100%]
-
-============ 60 passed in 15.23s ============
-```
-
-## Agregar Nuevos Tests
-
-### Template para nuevo test
+### Template
 
 ```python
 """
-Tests for [module_name].
+Tests for the surrogate extractor.
 """
 
 import pytest
 import numpy as np
-from blackbox2c import [imports]
+from blackbox2c import Converter, ConversionConfig
 
 
-class Test[ClassName]:
-    """Test [ClassName] class."""
-    
+class TestSurrogateExtractor:
+    """Test SurrogateExtractor behavior."""
+
     @pytest.fixture
     def sample_data(self):
         """Create sample data for testing."""
-        # Setup code
-        return data
-    
-    def test_[feature_name](self, sample_data):
-        """Test [specific feature]."""
+        rng = np.random.default_rng(42)
+        return rng.random((100, 4))
+
+    def test_extract_from_random_forest(self, sample_data):
         # Arrange
+        converter = Converter(ConversionConfig())
+
         # Act
+        code = converter.convert(model, sample_data)
+
         # Assert
-        assert condition
+        assert "uint8_t predict" in code
 ```
 
-### Mejores Prácticas
+Use `@pytest.mark.parametrize` for matrix-style cases, as done throughout the
+suite (e.g. `test_all_targets_all_levels_no_negative_index[medium-c]`).
 
-1. **Nombres descriptivos**: `test_convert_random_forest_with_high_fidelity`
-2. **Un concepto por test**: Cada test valida una cosa específica
-3. **Fixtures para setup**: Reutilizar código de preparación
-4. **Assertions claras**: Mensajes de error informativos
-5. **Independencia**: Tests no dependen entre sí
+### Best Practices
 
-## Tests Pendientes (Futuro)
+1. **Descriptive names**: `test_convert_random_forest_with_high_fidelity`
+2. **One concept per test**: each test validates one specific behavior
+3. **Fixtures for setup**: reuse data preparation code
+4. **Clear assertions**: informative error messages
+5. **Independence**: tests must not depend on each other
 
-### Fase 2: Tests Avanzados
+### Regression Policy
 
-- [ ] Tests de performance/benchmarking
-- [ ] Tests de integración con hardware real
-- [ ] Tests de compilación de código C generado
-- [ ] Tests de precisión numérica (punto fijo vs flotante)
-- [ ] Tests de casos extremos (edge cases)
-
-### Fase 3: Tests de Nuevos Features
-
-- [ ] Tests de regresión (cuando se implemente)
-- [ ] Tests de exportación a múltiples formatos
-- [ ] Tests de cuantización avanzada
-- [ ] Tests de optimizaciones específicas por arquitectura
-
-## Debugging Tests
-
-### Test falla
-
-```bash
-# Ejecutar con más detalle
-pytest tests/test_config.py::test_invalid_max_depth -vv
-
-# Detener en el primer fallo
-pytest tests/ -x
-
-# Mostrar print statements
-pytest tests/ -s
-```
-
-### Ver cobertura
-
-```bash
-# Generar reporte HTML
-pytest tests/ --cov=blackbox2c --cov-report=html
-
-# Abrir en navegador
-# htmlcov/index.html
-```
-
-## CI/CD Integration
-
-### GitHub Actions (futuro)
-
-```yaml
-name: Tests
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Run tests
-        run: pytest tests/ --cov=blackbox2c
-```
-
-## Mantenimiento
-
-### Actualizar tests cuando
-
-- Se agrega un nuevo feature
-- Se encuentra un bug (agregar test de regresión)
-- Se modifica la API pública
-- Se optimiza código existente
-
-### Revisar tests cuando
-
-- Tests fallan después de cambios
-- Cobertura disminuye
-- Tests se vuelven lentos (>1 minuto)
+When you find a bug, add a regression test before fixing it — see
+[`test_prune_negative_index_bug.py`](test_prune_negative_index_bug.py) for the
+pattern used for the `features[-2]` prune bug. The suite also enforces the
+project's leaf-detection convention (`feature == -2` plus both children
+undefined) across codegen, exporters and extraction.
 
 ---
 
-**Última actualización**: 2025-10-09  
-**Cobertura actual**: ~85% (estimado)  
-**Tests totales**: 60+
+## Roadmap (Future Test Work)
+
+- [ ] Compile generated C code in CI (real toolchain validation)
+- [ ] Performance/benchmark regression tests
+- [ ] Integration tests on real hardware
+- [ ] Architecture-specific optimization tests
+
+---
+
+## Maintenance
+
+### Update tests when
+
+- A new feature is added
+- A bug is found (add a regression test first)
+- The public API changes
+- Existing code is optimized
+
+### Review tests when
+
+- Tests fail after changes
+- Coverage drops
+- The suite becomes slow (>1 minute)
+
+---
+
+**Last updated**: 2026-09-22 · **Reference version**: v0.2.3 · **Tests**: 326 · **Coverage**: 93%
