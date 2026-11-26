@@ -145,3 +145,61 @@ class TestRegressionRuleOptimization:
         for node_id in expected_collapses:
             assert tree_struct.feature[node_id] == TREE_LEAF
             assert tree_struct.children_left[node_id] == tree_struct.children_right[node_id]
+
+
+class TestEstimatorImmutability:
+    """
+    ``convert()`` must treat the caller's estimator as immutable input.
+
+    The optimizer mutates the tree in place, and ``Converter.convert`` stored
+    the caller's ``DecisionTree*`` in ``surrogate_tree_`` directly, so a
+    conversion pruned the user's fitted model: its predictions changed and a
+    second conversion started from an already-damaged tree.
+    """
+
+    _SNAPSHOT_FIELDS = (
+        'feature',
+        'threshold',
+        'children_left',
+        'children_right',
+        'value',
+        'n_node_samples',
+    )
+
+    @pytest.mark.parametrize('kind', ['classifier', 'regressor'])
+    def test_convert_does_not_mutate_caller_estimator(self, kind):
+        if kind == 'classifier':
+            model, X = _classification_tree()
+        else:
+            model, X = _regression_tree()
+
+        snapshot = {
+            field: np.array(getattr(model.tree_, field), copy=True)
+            for field in self._SNAPSHOT_FIELDS
+        }
+        node_count = model.tree_.node_count
+        expected_predictions = model.predict(X)
+
+        Converter().convert(model, X)
+
+        assert model.tree_.node_count == node_count
+        for field, before in snapshot.items():
+            assert np.array_equal(getattr(model.tree_, field), before), (
+                f"convert() mutated tree_.{field}"
+            )
+        assert np.array_equal(model.predict(X), expected_predictions)
+
+    def test_converting_the_same_model_twice_is_idempotent(self):
+        model, X = _regression_tree()
+
+        first = Converter().convert(model, X)
+        second = Converter().convert(model, X)
+
+        assert second == first
+
+    def test_surrogate_tree_is_not_the_caller_estimator(self):
+        model, X = _regression_tree()
+        converter = Converter()
+        converter.convert(model, X)
+
+        assert converter.surrogate_tree_ is not model

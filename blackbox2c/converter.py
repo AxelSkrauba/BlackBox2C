@@ -2,6 +2,8 @@
 Main conversion module - orchestrates the entire conversion process.
 """
 
+import copy
+
 import numpy as np
 from sklearn.base import BaseEstimator, is_regressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -84,6 +86,10 @@ class Converter:
         tree trained on synthetic boundary samples; ``fidelity`` in the
         conversion metrics reports agreement between that surrogate and the
         original model on ``X_test`` when supplied, otherwise on ``X_train``.
+
+        The estimator is treated as read-only input: rule optimization runs on
+        a private copy, so the fitted model passed in is never modified and
+        converting the same model twice returns the same code.
         
         Parameters
         ----------
@@ -241,6 +247,12 @@ class Converter:
         
         # Optimize rules
         print("\n[2/4] Optimizing decision rules...")
+        # The optimizer rewrites node payloads and structural attributes in
+        # place. Optimize a private copy so the caller's fitted estimator stays
+        # untouched and repeated conversions of the same model are
+        # reproducible (deepcopy preserves ``_estimator_type``, ``classes_``
+        # and ``n_features_in_``).
+        self.surrogate_tree_ = copy.deepcopy(self.surrogate_tree_)
         optimizer = RuleOptimizer(optimization_level=self.config.optimize_rules)
         self.surrogate_tree_ = optimizer.optimize(self.surrogate_tree_)
         

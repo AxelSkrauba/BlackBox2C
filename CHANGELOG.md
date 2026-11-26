@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   branches are now collapsed only when both leaves predict exactly the same
   value, and `'high'` merges sibling leaves whose means differ by at most 5%
   while storing the sample-weighted mean.
+- **`convert()` no longer modifies the estimator you pass in.** Rule
+  optimization mutates the tree in place, and a direct `DecisionTree*` input was
+  stored in `surrogate_tree_` by reference, so a conversion pruned the caller's
+  fitted model: its predictions changed and a second conversion started from an
+  already-damaged tree. Conversion now optimizes a private copy, which also
+  makes repeated conversions of the same model return identical code.
 
 ### Planned
 - Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)
