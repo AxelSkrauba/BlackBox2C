@@ -83,9 +83,13 @@ class Converter:
 
         DecisionTreeClassifier and DecisionTreeRegressor inputs are emitted
         directly. Every other estimator is approximated by a surrogate decision
-        tree trained on synthetic boundary samples; ``fidelity`` in the
-        conversion metrics reports agreement between that surrogate and the
-        original model on ``X_test`` when supplied, otherwise on ``X_train``.
+        tree trained on synthetic boundary samples.
+
+        ``fidelity`` in the conversion metrics reports agreement between the
+        tree that is finally emitted (after rule optimization) and the original
+        model, measured on ``X_test`` when supplied, otherwise on ``X_train``.
+        Measuring after optimization is what makes the number describe the code
+        you actually receive.
 
         The estimator is treated as read-only input: rule optimization runs on
         a private copy, so the fitted model passed in is never modified and
@@ -207,43 +211,27 @@ class Converter:
         if isinstance(model, (DecisionTreeClassifier, DecisionTreeRegressor)):
             print("  Model is already a decision tree, using directly.")
             self.surrogate_tree_ = model
-            fidelity = 1.0
-            fidelity_evaluation_set = 'direct_tree'
+            is_direct_tree = True
         else:
             task_type = 'regression' if is_regression else 'classification'
             self.surrogate_tree_ = surrogate_extractor.extract(
                 model_for_surrogate, X_train, self.feature_names_,
                 task_type=task_type
             )
-            fidelity_evaluation_set = 'test' if X_test is not None else 'train'
-            fidelity = surrogate_extractor.get_fidelity(
-                model_for_surrogate, X_test if X_test is not None else X_train
-            )
-            print(f"  Surrogate fidelity: {fidelity:.4f}")
-            if fidelity_evaluation_set == 'train':
-                warnings.warn(
-                    "Surrogate fidelity was evaluated on X_train because no "
-                    "X_test was provided; this is not an independent estimate "
-                    "of deployed-model fidelity.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            threshold = self.config.fidelity_warning_threshold
-            if threshold is not None and fidelity < threshold:
-                warnings.warn(
-                    f"Surrogate fidelity {fidelity:.4f} is below "
-                    f"fidelity_warning_threshold={threshold:.4f}. Consider "
-                    "using X_test, increasing max_depth or n_samples, or "
-                    "reviewing the selected features.",
-                    UserWarning,
-                    stacklevel=2,
-                )
+            is_direct_tree = False
 
-        self.metrics_['fidelity'] = fidelity
-        self.metrics_['fidelity_evaluation_set'] = fidelity_evaluation_set
-        self.metrics_['fidelity_warning_threshold'] = (
-            self.config.fidelity_warning_threshold
-        )
+        # Model whose predictions the emitted tree has to reproduce, and the
+        # dataset used to measure the agreement.
+        fidelity_reference_model = model if is_direct_tree else model_for_surrogate
+        if X_test is not None:
+            fidelity_evaluation_set = 'test'
+            X_fidelity = X_test
+        elif is_direct_tree:
+            fidelity_evaluation_set = 'direct_tree'
+            X_fidelity = X_train
+        else:
+            fidelity_evaluation_set = 'train'
+            X_fidelity = X_train
         
         # Optimize rules
         print("\n[2/4] Optimizing decision rules...")
@@ -259,6 +247,38 @@ class Converter:
         complexity = optimizer.analyze_complexity(self.surrogate_tree_)
         print(f"  Nodes: {complexity['n_nodes']}, Leaves: {complexity['n_leaves']}, Depth: {complexity['max_depth']}")
         self.metrics_['complexity'] = complexity
+
+        # Fidelity must describe the tree that is actually emitted, so it is
+        # measured after optimization. Measuring it before the optimizer ran
+        # reported the accuracy of a tree the user never received.
+        fidelity = surrogate_extractor.get_fidelity(
+            fidelity_reference_model, X_fidelity, tree=self.surrogate_tree_
+        )
+        print(f"  Fidelity of the optimized tree: {fidelity:.4f}")
+        if fidelity_evaluation_set == 'train':
+            warnings.warn(
+                "Surrogate fidelity was evaluated on X_train because no "
+                "X_test was provided; this is not an independent estimate "
+                "of deployed-model fidelity.",
+                UserWarning,
+                stacklevel=2,
+            )
+        threshold = self.config.fidelity_warning_threshold
+        if threshold is not None and fidelity < threshold:
+            warnings.warn(
+                f"Fidelity of the optimized tree is {fidelity:.4f}, below "
+                f"fidelity_warning_threshold={threshold:.4f}. Consider "
+                "using X_test, increasing max_depth or n_samples, or "
+                "reviewing the selected features.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        self.metrics_['fidelity'] = fidelity
+        self.metrics_['fidelity_evaluation_set'] = fidelity_evaluation_set
+        self.metrics_['fidelity_warning_threshold'] = (
+            self.config.fidelity_warning_threshold
+        )
 
         # ── Advanced (IR-level) optimization (v0.2) ──────────────
         # Run after the legacy pass so QM/BDD see an already-pruned tree.

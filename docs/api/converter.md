@@ -29,9 +29,11 @@ converter.convert(
 
 Run the full pipeline and return generated code. Decision tree inputs are
 exported directly; other estimators are approximated through a surrogate tree.
-Pass `X_test` to evaluate surrogate fidelity on held-out data. If it is omitted,
-BlackBox2C evaluates on `X_train` and emits a warning because that is not an
-independent estimate.
+Fidelity is measured after rule optimization, on the tree that is finally
+emitted, so `metrics['fidelity']` describes the generated code rather than an
+intermediate tree. Pass `X_test` to evaluate it on held-out data. If it is
+omitted, BlackBox2C evaluates on `X_train` and emits a warning because that is
+not an independent estimate.
 
 **Parameters**: same as `convert()` convenience function, minus `config` and `**config_kwargs`.
 
@@ -47,7 +49,7 @@ Returns a `dict` with conversion metrics:
 
 ```python
 {
-    'fidelity': 0.974,              # agreement with original model
+    'fidelity': 0.974,              # agreement of the emitted tree with the model
     'fidelity_evaluation_set': 'test',  # 'test', 'train', or 'direct_tree'
     'fidelity_warning_threshold': 0.95,
     'complexity': {

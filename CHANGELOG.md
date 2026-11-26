@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fitted model: its predictions changed and a second conversion started from an
   already-damaged tree. Conversion now optimizes a private copy, which also
   makes repeated conversions of the same model return identical code.
+- **Reported fidelity now describes the emitted tree.** Fidelity was measured
+  right after surrogate extraction and before rule optimization, and direct
+  tree inputs reported a hardcoded `1.0`, so `metrics['fidelity']` described a
+  tree the user never received. On a `GradientBoostingRegressor` conversion the
+  metrics reported `0.762` while the exported tree scored `R^2 = -7.61`; the
+  metric now matches the exported tree exactly. The low-fidelity warning is
+  reported against that measured value, including for direct tree inputs.
 
 ### Planned
 - Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)

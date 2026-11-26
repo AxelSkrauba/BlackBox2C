@@ -179,9 +179,14 @@ class SurrogateExtractor:
         
         return X_synthetic
     
-    def get_fidelity(self, model: BaseEstimator, X_test: np.ndarray) -> float:
+    def get_fidelity(
+        self,
+        model: BaseEstimator,
+        X_test: np.ndarray,
+        tree: Optional[Union[DecisionTreeClassifier, DecisionTreeRegressor]] = None,
+    ) -> float:
         """
-        Calculate fidelity: agreement between surrogate and original model.
+        Calculate fidelity: agreement between a surrogate tree and the model.
         
         For classification: accuracy (exact match)
         For regression: R^2 score (coefficient of determination)
@@ -192,6 +197,10 @@ class SurrogateExtractor:
             The original model.
         X_test : np.ndarray
             Test data.
+        tree : DecisionTreeClassifier or DecisionTreeRegressor, optional
+            Tree to score. Defaults to the tree produced by :meth:`extract`.
+            Conversion passes the post-optimization tree so the reported
+            fidelity describes the artifact that is actually emitted.
         
         Returns
         -------
@@ -199,14 +208,16 @@ class SurrogateExtractor:
             Fidelity score (0-1 for classification, -inf to 1 for regression).
             Higher is better.
         """
-        if self.surrogate_tree_ is None:
-            raise ValueError("Must call extract() first")
+        if tree is None:
+            if self.surrogate_tree_ is None:
+                raise ValueError("Must call extract() first")
+            tree = self.surrogate_tree_
         
         y_original = model.predict(X_test)
-        y_surrogate = self.surrogate_tree_.predict(X_test)
+        y_surrogate = tree.predict(X_test)
         
         # Detect if regression or classification
-        is_regression = isinstance(self.surrogate_tree_, DecisionTreeRegressor)
+        is_regression = isinstance(tree, DecisionTreeRegressor)
         
         if is_regression:
             # For regression: use R^2 score

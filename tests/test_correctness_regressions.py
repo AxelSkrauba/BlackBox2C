@@ -203,3 +203,103 @@ class TestEstimatorImmutability:
         converter.convert(model, X)
 
         assert converter.surrogate_tree_ is not model
+
+
+class TestFidelityReporting:
+    """
+    The reported fidelity must describe the tree that is actually emitted.
+
+    ``Converter.convert`` measured fidelity right after surrogate extraction
+    and *before* ``optimizer.optimize``, and hardcoded ``1.0`` for direct tree
+    inputs. The metric therefore described a tree that was no longer the one
+    being exported, which is why the regression corruption went unnoticed.
+    """
+
+    @staticmethod
+    def _damage_tree(self, tree):
+        """Stand-in for ``RuleOptimizer.optimize`` that destroys the tree."""
+        tree.tree_.value[:] = 0.0
+        return tree
+
+    def test_fidelity_is_measured_after_optimization(self, monkeypatch):
+        X, y = make_regression(
+            n_samples=300, n_features=4, n_informative=3, noise=5.0, random_state=3
+        )
+        model = GradientBoostingRegressor(random_state=3).fit(X, y)
+        X_eval = X[:120]
+        assert np.unique(model.predict(X_eval)).size > 3
+
+        converter = Converter(
+            ConversionConfig(
+                max_depth=3, n_samples=400, fidelity_warning_threshold=None
+            )
+        )
+        monkeypatch.setattr(RuleOptimizer, 'optimize', self._damage_tree)
+        converter.convert(model, X, X_test=X_eval)
+
+        assert converter.metrics_['fidelity'] < 0.1, (
+            "fidelity described the pre-optimization surrogate instead of the "
+            "emitted tree"
+        )
+        assert converter.metrics_['fidelity_evaluation_set'] == 'test'
+
+    def test_direct_tree_fidelity_is_measured_not_assumed(self, monkeypatch):
+        model, X = _regression_tree()
+        X_eval = X[:120]
+
+        converter = Converter(ConversionConfig(fidelity_warning_threshold=None))
+        monkeypatch.setattr(RuleOptimizer, 'optimize', self._damage_tree)
+        converter.convert(model, X, X_test=X_eval)
+
+        assert converter.metrics_['fidelity'] < 0.1, (
+            "direct tree conversion still reports a hardcoded fidelity of 1.0"
+        )
+        assert converter.metrics_['fidelity_evaluation_set'] == 'test'
+
+    def test_direct_tree_without_test_set_keeps_its_source_label(self):
+        model, X = _regression_tree()
+
+        converter = Converter(ConversionConfig(fidelity_warning_threshold=None))
+        converter.convert(model, X)
+
+        assert converter.metrics_['fidelity_evaluation_set'] == 'direct_tree'
+        assert converter.metrics_['fidelity'] == pytest.approx(1.0)
+
+    def test_reported_fidelity_matches_the_emitted_regression_tree(self):
+        model, X = _regression_tree()
+        X_eval = X[:120]
+
+        converter = Converter(ConversionConfig(optimize_rules='high'))
+        converter.convert(model, X, X_test=X_eval)
+
+        expected = r2_score(
+            model.predict(X_eval), converter.surrogate_tree_.predict(X_eval)
+        )
+        assert converter.metrics_['fidelity'] == pytest.approx(expected, abs=1e-12)
+
+    def test_reported_fidelity_matches_the_emitted_classifier(self):
+        X, y = make_classification(
+            n_samples=400,
+            n_features=4,
+            n_informative=3,
+            n_redundant=0,
+            n_classes=3,
+            random_state=5,
+        )
+        model = RandomForestClassifier(n_estimators=20, random_state=5).fit(X, y)
+        X_eval = X[:150]
+
+        converter = Converter(
+            ConversionConfig(
+                max_depth=4,
+                n_samples=500,
+                optimize_rules='high',
+                fidelity_warning_threshold=None,
+            )
+        )
+        converter.convert(model, X, X_test=X_eval)
+
+        expected = np.mean(
+            model.predict(X_eval) == converter.surrogate_tree_.predict(X_eval)
+        )
+        assert converter.metrics_['fidelity'] == pytest.approx(expected, abs=1e-12)

@@ -24,10 +24,11 @@ with a C compiler, and fits in a few hundred bytes of FLASH.
    language.
 
 > **Surrogate fidelity:** DecisionTree inputs are exported directly. Other estimators are approximated
-> by the surrogate tree above, so generated predictions may differ from the original model. Supply
-> `X_test` to measure fidelity on held-out data; without it, BlackBox2C warns that fidelity was
-> measured on `X_train`. Set `fidelity_warning_threshold=None` only when you explicitly want to
-> disable low-fidelity warnings.
+> by the surrogate tree above, so generated predictions may differ from the original model. Fidelity is
+> measured **after** rule optimization, on the tree that is actually emitted, so the reported number
+> describes the code you get. Supply `X_test` to measure it on held-out data; without it, BlackBox2C
+> warns that fidelity was measured on `X_train`. Set `fidelity_warning_threshold=None` only when you
+> explicitly want to disable low-fidelity warnings.
 
 ---
 
