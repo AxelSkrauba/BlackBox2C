@@ -73,11 +73,15 @@ class TestCLIParser:
         assert args.command == "export"
         assert args.format == "arduino"
 
-    def test_version_flag(self):
+    def test_version_flag(self, capsys):
+        from blackbox2c import __version__
+
         parser = build_parser()
         with pytest.raises(SystemExit) as exc_info:
             parser.parse_args(["--version"])
+
         assert exc_info.value.code == 0
+        assert capsys.readouterr().out.strip() == f"blackbox2c {__version__}"
 
     def test_invalid_target_raises(self):
         parser = build_parser()

@@ -14,12 +14,10 @@ released version, so the defect cannot come back unnoticed:
   estimator owned by the caller.
 """
 
-import copy
 import re
 
 import numpy as np
 import pytest
-from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
 from sklearn.metrics import r2_score

@@ -12,6 +12,8 @@ import sys
 import os
 import pickle
 
+from . import __version__
+
 
 def _load_model(path: str):
     """Load a pickled scikit-learn model from disk."""
@@ -170,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--version", action="version", version="%(prog)s 0.2.0"
+        "--version", action="version", version=f"%(prog)s {__version__}"
     )
 
     subparsers = parser.add_subparsers(dest="command", metavar="<command>")
