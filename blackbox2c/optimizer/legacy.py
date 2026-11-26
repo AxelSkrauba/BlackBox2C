@@ -6,10 +6,74 @@ extracted from models.
 """
 
 import numpy as np
+from sklearn.base import is_regressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from typing import List, Tuple, Set, Union
 
 from ..tree_constants import TREE_LEAF, TREE_UNDEFINED
+
+#: Relative tolerance used by the ``'high'`` level to merge sibling
+#: regression leaves. A value of ``0.05`` mirrors the ``0.95`` cosine
+#: similarity threshold used for classification: two leaves whose
+#: predictions differ by up to 5 % are considered interchangeable.
+REGRESSION_MERGE_RTOL = 0.05
+
+
+def _is_regression_tree(tree) -> bool:
+    """
+    Return ``True`` when ``tree`` predicts a continuous target.
+
+    ``sklearn.base.is_regressor`` is authoritative because it reads the
+    estimator's ``_estimator_type``.  Non-conformant estimators (mocks and
+    wrappers without that attribute) fall back to the node payload layout:
+    regressors store a single scalar mean per node
+    (``value.shape == (n_nodes, 1, 1)``), while classifiers store one entry
+    per class.
+    """
+    try:
+        return bool(is_regressor(tree))
+    except AttributeError:
+        return tree.tree_.value.shape[2] == 1
+
+
+def _regression_value(tree_struct, node_id: int) -> float:
+    """Return the scalar prediction stored at ``node_id``."""
+    return float(tree_struct.value[node_id][0][0])
+
+
+def _collapse_to_leaf(
+    tree_struct, node_id: int, left_child: int, right_child: int, value
+) -> None:
+    """
+    Turn ``node_id`` into a leaf that predicts ``value``.
+
+    All four structural attributes must be updated consistently: setting only
+    ``feature`` to the leaf sentinel leaves ``children_left``/``children_right``
+    pointing at the original (distinct) children, which the platform exporters
+    detect as an internal node and emit as ``features[-2]`` — an invalid
+    negative array index in C (v0.2.0 bug).
+
+    Parameters
+    ----------
+    tree_struct : sklearn.tree._tree.Tree
+        The tree being mutated.
+    node_id : int
+        Node to convert into a leaf.
+    left_child, right_child : int
+        The node's children, used to accumulate the sample count.
+    value : float or np.ndarray
+        Prediction payload for the new leaf: a scalar mean for regressors or
+        the summed class counts for classifiers.
+    """
+    tree_struct.value[node_id] = value
+    tree_struct.n_node_samples[node_id] = (
+        tree_struct.n_node_samples[left_child]
+        + tree_struct.n_node_samples[right_child]
+    )
+    tree_struct.feature[node_id] = TREE_LEAF
+    tree_struct.threshold[node_id] = TREE_LEAF
+    tree_struct.children_left[node_id] = TREE_UNDEFINED
+    tree_struct.children_right[node_id] = TREE_UNDEFINED
 
 
 class RuleOptimizer:
@@ -69,13 +133,19 @@ class RuleOptimizer:
     ):
         """
         Prune branches that lead to the same outcome.
-        
+
+        A branch is redundant when both children are leaves that predict the
+        same outcome. For classifiers the outcome is the argmax class; for
+        regressors it is the predicted value, which must match exactly so the
+        pruning leaves the model function bit-identical.
+
         This is a simplified version - in production, you'd want
         more sophisticated pruning based on cost-complexity.
         """
         tree_struct = tree.tree_
-        
-        # Identify nodes where both children lead to same class
+        is_regression = _is_regression_tree(tree)
+
+        # Identify nodes whose two children are leaves with the same outcome
         for node_id in range(tree_struct.node_count):
             if tree_struct.feature[node_id] == TREE_LEAF:  # Skip leaves
                 continue
@@ -87,26 +157,32 @@ class RuleOptimizer:
             if (tree_struct.feature[left_child] == TREE_LEAF and
                 tree_struct.feature[right_child] == TREE_LEAF):
 
-                left_class = np.argmax(tree_struct.value[left_child][0])
-                right_class = np.argmax(tree_struct.value[right_child][0])
-
-                if left_class == right_class:
-                    # Convert this node to a leaf.  All four structural
-                    # attributes must be updated consistently: setting only
-                    # ``feature`` to the leaf sentinel leaves
-                    # ``children_left``/``children_right`` pointing at the
-                    # original (distinct) children, which the platform
-                    # exporters detect as an internal node and emit as
-                    # ``features[-2]`` — an invalid negative array index
-                    # in C (v0.2.0 bug).
-                    tree_struct.value[node_id] = (
+                if is_regression:
+                    # A regressor stores one scalar mean per node, so
+                    # ``argmax`` would always be 0 and every pair would look
+                    # identical (v0.2.0 - v0.2.3 regression corruption).
+                    # Two regression leaves are redundant only when they
+                    # predict exactly the same value.
+                    left_value = _regression_value(tree_struct, left_child)
+                    right_value = _regression_value(tree_struct, right_child)
+                    if left_value != right_value:
+                        continue
+                    merged_value = left_value
+                else:
+                    left_class = np.argmax(tree_struct.value[left_child][0])
+                    right_class = np.argmax(tree_struct.value[right_child][0])
+                    if left_class != right_class:
+                        continue
+                    # Classifiers store class counts, so summing the
+                    # children's payloads reproduces the parent counts.
+                    merged_value = (
                         tree_struct.value[left_child]
                         + tree_struct.value[right_child]
                     )
-                    tree_struct.feature[node_id] = TREE_LEAF
-                    tree_struct.threshold[node_id] = TREE_LEAF
-                    tree_struct.children_left[node_id] = TREE_UNDEFINED
-                    tree_struct.children_right[node_id] = TREE_UNDEFINED
+
+                _collapse_to_leaf(
+                    tree_struct, node_id, left_child, right_child, merged_value
+                )
     
     def _merge_similar_leaves(
         self, tree: Union[DecisionTreeClassifier, DecisionTreeRegressor]
@@ -116,9 +192,11 @@ class RuleOptimizer:
         
         This is useful when the surrogate tree has created
         unnecessary distinctions. Uses iterative approach to merge
-        sibling leaves with similar class distributions.
+        sibling leaves with similar class distributions (classifiers) or
+        similar predicted values (:data:`REGRESSION_MERGE_RTOL`).
         """
         tree_struct = tree.tree_
+        is_regression = _is_regression_tree(tree)
         changed = True
         merge_count = 0
         
@@ -137,41 +215,55 @@ class RuleOptimizer:
                 # Both children must be leaves
                 if (tree_struct.feature[left_child] == TREE_LEAF and
                     tree_struct.feature[right_child] == TREE_LEAF):
-                    
-                    # Get class distributions
-                    left_dist = tree_struct.value[left_child][0]
-                    right_dist = tree_struct.value[right_child][0]
-                    
-                    # Get predicted classes
-                    left_class = np.argmax(left_dist)
-                    right_class = np.argmax(right_dist)
-                    
-                    # If same class, check similarity
-                    if left_class == right_class:
+
+                    if is_regression:
+                        # Merge sibling leaves whose means are close; the
+                        # merged leaf must carry the sample-weighted mean,
+                        # because a regressor stores the mean rather than a
+                        # count (summing the two means would be wrong).
+                        left_value = _regression_value(tree_struct, left_child)
+                        right_value = _regression_value(tree_struct, right_child)
+                        if not np.isclose(
+                            left_value, right_value, rtol=REGRESSION_MERGE_RTOL, atol=0.0
+                        ):
+                            continue
+                        left_count = tree_struct.n_node_samples[left_child]
+                        right_count = tree_struct.n_node_samples[right_child]
+                        merged_value = (
+                            left_value * left_count + right_value * right_count
+                        ) / (left_count + right_count)
+                    else:
+                        # Get class distributions
+                        left_dist = tree_struct.value[left_child][0]
+                        right_dist = tree_struct.value[right_child][0]
+
+                        # Get predicted classes
+                        left_class = np.argmax(left_dist)
+                        right_class = np.argmax(right_dist)
+
+                        # Only same-class siblings can be merged
+                        if left_class != right_class:
+                            continue
+
                         # Normalize to probabilities
                         left_probs = left_dist / (left_dist.sum() + 1e-10)
                         right_probs = right_dist / (right_dist.sum() + 1e-10)
-                        
+
                         # Calculate cosine similarity
                         similarity = np.dot(left_probs, right_probs) / (
                             np.linalg.norm(left_probs) * np.linalg.norm(right_probs) + 1e-10
                         )
-                        
+
                         # If very similar (>0.95), merge by converting parent to leaf
-                        if similarity > 0.95:
-                            # Combine distributions
-                            tree_struct.value[node_id] = np.array([[left_dist + right_dist]])
-                            # Mark as leaf — update all structural
-                            # attributes consistently so platform
-                            # exporters (which detect leaves via
-                            # ``children_left == children_right``) treat
-                            # this node as a leaf too.
-                            tree_struct.feature[node_id] = TREE_LEAF
-                            tree_struct.threshold[node_id] = TREE_LEAF
-                            tree_struct.children_left[node_id] = TREE_UNDEFINED
-                            tree_struct.children_right[node_id] = TREE_UNDEFINED
-                            changed = True
-                            merge_count += 1
+                        if similarity <= 0.95:
+                            continue
+                        merged_value = left_dist + right_dist
+
+                    _collapse_to_leaf(
+                        tree_struct, node_id, left_child, right_child, merged_value
+                    )
+                    changed = True
+                    merge_count += 1
         
         return merge_count
     

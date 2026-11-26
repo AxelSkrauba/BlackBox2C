@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Regression trees keep their predictions through rule optimization.**
+  `_prune_redundant_branches` compared `np.argmax(tree.value[child][0])`, but a
+  regressor stores one scalar per node, so that index was always `0` and every
+  internal node with two leaf children was collapsed into the average of both
+  leaves. Because `optimize_rules='medium'` is the default, regression
+  conversions could be flattened into a nearly constant function while the
+  reported fidelity still referred to the pre-optimization tree. Regression
+  branches are now collapsed only when both leaves predict exactly the same
+  value, and `'high'` merges sibling leaves whose means differ by at most 5%
+  while storing the sample-weighted mean.
+
 ### Planned
 - Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)
 - IR-aware exporters (C++, Arduino, MicroPython): currently advanced
