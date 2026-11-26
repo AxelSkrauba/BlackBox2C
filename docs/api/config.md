@@ -20,7 +20,7 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 | `n_samples` | `int` | `10000` | Number of synthetic samples generated for surrogate training. |
 | `feature_threshold` | `int` | `None` | If set, selects the most important features before conversion. Only applies to estimators converted through a surrogate tree: a direct `DecisionTree*` input raises `ValueError`, because its fitted nodes still reference the original feature indices. |
 | `memory_budget_kb` | `float` | `None` | FLASH budget in KB. Pre-tunes small budgets and warns after conversion if estimated FLASH exceeds it; not a compiled-firmware guarantee. |
-| `fidelity_warning_threshold` | `float` or `None` | `0.95` | Warn when surrogate fidelity is lower. Set to `None` to disable this warning. |
+| `fidelity_warning_threshold` | `float` or `None` | `0.95` | Warn when the fidelity of the emitted tree is lower. Set to `None` to disable this warning. |
 | `random_state` | `int` | `42` | Random seed for reproducibility. |
 | `include_probabilities` | `bool` | `False` | **Not yet implemented.** Will emit a warning if set to `True`. |
 | `qm_max_literals` | `int` | `12` | *(v0.2)* Cap on unique literals before `'qm'` falls back to identity (with `UserWarning`). |

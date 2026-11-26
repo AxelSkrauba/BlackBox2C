@@ -179,7 +179,7 @@ config = ConversionConfig(
     precision=8,             # Bit width for fixed-point: 8 | 16 | 32
     function_name='predict', # Name of the generated function
     n_samples=10000,         # Synthetic samples for surrogate training
-    fidelity_warning_threshold=0.95,  # Warn below this surrogate fidelity
+    fidelity_warning_threshold=0.95,  # Warn below this emitted-tree fidelity
     feature_threshold=None,  # Auto-select N most important features
     memory_budget_kb=None,   # Tune small budgets and validate estimated FLASH
 )
