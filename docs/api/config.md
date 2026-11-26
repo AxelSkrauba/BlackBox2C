@@ -18,7 +18,7 @@ Dataclass holding all conversion parameters. Pass to `Converter(config)` or as
 | `precision` | `int` | `8` | Bit width for fixed-point scaling: `8`, `16`, or `32`. Ignored if `use_fixed_point=False`. |
 | `function_name` | `str` | `'predict'` | Name of the generated C/C++ function. |
 | `n_samples` | `int` | `10000` | Number of synthetic samples generated for surrogate training. |
-| `feature_threshold` | `int` | `None` | If set, automatically selects the N most important features before conversion. |
+| `feature_threshold` | `int` | `None` | If set, selects the most important features before conversion. Only applies to estimators converted through a surrogate tree: a direct `DecisionTree*` input raises `ValueError`, because its fitted nodes still reference the original feature indices. |
 | `memory_budget_kb` | `float` | `None` | FLASH budget in KB. Pre-tunes small budgets and warns after conversion if estimated FLASH exceeds it; not a compiled-firmware guarantee. |
 | `fidelity_warning_threshold` | `float` or `None` | `0.95` | Warn when surrogate fidelity is lower. Set to `None` to disable this warning. |
 | `random_state` | `int` | `42` | Random seed for reproducibility. |

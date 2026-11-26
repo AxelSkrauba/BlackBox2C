@@ -450,6 +450,24 @@ class Converter:
             raise TypeError(
                 f"Model must have a predict() method. Got type: {type(model).__name__}"
             )
+
+        # ``feature_threshold`` slices X_train down to the selected columns
+        # before the surrogate tree is trained. A fitted DecisionTree* is
+        # exported as-is and keeps referencing the original feature indices, so
+        # the generated code would index ``features[i]`` outside the reduced
+        # signature it declares - an out-of-bounds read in the emitted C/C++.
+        if self.config.feature_threshold is not None and isinstance(
+            model, (DecisionTreeClassifier, DecisionTreeRegressor)
+        ):
+            raise ValueError(
+                f"feature_threshold={self.config.feature_threshold} is not "
+                f"supported for direct {type(model).__name__} input: the fitted "
+                "tree references the original feature indices, so generated "
+                "code would index features outside the reduced signature. "
+                "Convert without feature_threshold, or pass the model inside a "
+                "Pipeline (or any other estimator) so a surrogate tree is "
+                "extracted on the selected features."
+            )
         
         # X_train already converted to np.ndarray before this call
         if not isinstance(X_train, np.ndarray):

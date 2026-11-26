@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metrics reported `0.762` while the exported tree scored `R^2 = -7.61`; the
   metric now matches the exported tree exactly. The low-fidelity warning is
   reported against that measured value, including for direct tree inputs.
+- **`feature_threshold` no longer emits out-of-bounds C.** Combining
+  `feature_threshold` with a direct `DecisionTree*` input sliced `X_train` down
+  to the selected columns but reused the fitted tree unchanged, so the emitted
+  code declared `predict(float features[2])` while still reading `features[3]`.
+  That combination now raises a `ValueError` that names the estimator and the
+  supported workaround (wrap the model so a surrogate tree is extracted on the
+  selected features).
 
 ### Planned
 - Hardware-validated benchmarks on real MCUs (Arduino Uno, ESP32, Pico)

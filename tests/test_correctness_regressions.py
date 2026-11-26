@@ -15,6 +15,7 @@ released version, so the defect cannot come back unnoticed:
 """
 
 import copy
+import re
 
 import numpy as np
 import pytest
@@ -303,3 +304,86 @@ class TestFidelityReporting:
             model.predict(X_eval) == converter.surrogate_tree_.predict(X_eval)
         )
         assert converter.metrics_['fidelity'] == pytest.approx(expected, abs=1e-12)
+
+
+class TestFeatureThresholdGuard:
+    """
+    ``feature_threshold`` must never emit code that indexes outside the
+    generated signature.
+
+    Feature selection slices ``X_train`` down to the selected columns and then
+    reuses a direct ``DecisionTree*`` input unchanged, so a 4-feature tree
+    trained on all columns was emitted under a ``predict(float features[2])``
+    signature while still reading ``features[3]`` - an out-of-bounds read in the
+    generated C/C++.
+    """
+
+    @pytest.mark.parametrize('kind', ['classifier', 'regressor'])
+    def test_direct_tree_with_feature_threshold_raises(self, kind):
+        model, X = (
+            _classification_tree() if kind == 'classifier' else _regression_tree()
+        )
+
+        with pytest.raises(ValueError, match='feature_threshold=2 is not supported'):
+            Converter(ConversionConfig(feature_threshold=2)).convert(model, X)
+
+    def test_error_names_the_model_type_and_a_workaround(self):
+        model, X = _classification_tree()
+
+        with pytest.raises(ValueError) as excinfo:
+            Converter(ConversionConfig(feature_threshold=2)).convert(model, X)
+
+        message = str(excinfo.value)
+        assert 'DecisionTreeClassifier' in message
+        assert 'Pipeline' in message
+
+    def test_direct_tree_without_feature_threshold_still_converts(self):
+        model, X = _classification_tree()
+        code = Converter().convert(model, X)
+
+        assert 'predict(float features[4])' in code
+
+    @pytest.mark.parametrize('scenario', ['direct_tree', 'feature_selection'])
+    def test_emitted_feature_indices_fit_the_signature(self, scenario):
+        """
+        Memory-safety invariant for every emission path.
+
+        Whatever the generated signature declares, the body must only index
+        features inside it. The direct tree + ``feature_threshold`` combination
+        violated this (signature ``features[2]``, body reading ``features[3]``).
+        """
+        if scenario == 'direct_tree':
+            model, X = _classification_tree()
+            config = ConversionConfig()
+        else:
+            X, y = make_classification(
+                n_samples=300,
+                n_features=5,
+                n_informative=3,
+                n_redundant=0,
+                n_classes=2,
+                random_state=11,
+            )
+            model = RandomForestClassifier(n_estimators=10, random_state=11).fit(X, y)
+            config = ConversionConfig(
+                feature_threshold=3,
+                max_depth=3,
+                n_samples=300,
+                fidelity_warning_threshold=None,
+            )
+
+        code = Converter(config).convert(model, X)
+
+        # Ignore comments (which document a usage example such as
+        # ``float input[4] = {...};``) and the signature itself, whose array
+        # size is not an index.
+        body = re.sub(r'/\*.*?\*/', '', code, flags=re.S)
+        signature = re.search(r'predict\(float features\[(\d+)\]\)', body)
+        assert signature is not None
+        n_features = int(signature.group(1))
+        body = body.replace(signature.group(0), '', 1)
+        used_indices = {int(i) for i in re.findall(r'features\[(\d+)\]', body)}
+        assert used_indices <= set(range(n_features)), (
+            f"emitted indices {sorted(used_indices)} do not fit a "
+            f"features[{n_features}] signature"
+        )

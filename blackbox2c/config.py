@@ -58,10 +58,16 @@ class ConversionConfig:
         generation before conversion falls back to the legacy tree path.
         
     feature_threshold : Optional[int], default=None
-        Maximum number of features to use after automatic selection.
+        Number of features to keep after automatic selection.
         When set, performs feature sensitivity analysis and keeps only
         the most important features up to this limit.
         None means use all features without selection.
+
+        Only applies to estimators that are converted through a surrogate
+        tree. A direct ``DecisionTreeClassifier``/``DecisionTreeRegressor``
+        input raises :class:`ValueError`, because its fitted nodes still
+        reference the original feature indices and the generated code would
+        index outside the reduced signature.
         
     memory_budget_kb : Optional[float], default=None
         Target memory budget in KB. Auto-adjusts other parameters.
