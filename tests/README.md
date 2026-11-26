@@ -1,6 +1,6 @@
 # BlackBox2C - Test Suite
 
-**326 tests · 93% coverage · 100% passing** *(reference: v0.2.3)*
+**346 tests · 93% coverage · 100% passing** *(reference: v0.2.4)*
 
 [![Tests](https://github.com/AxelSkrauba/BlackBox2C/actions/workflows/ci.yml/badge.svg)](https://github.com/AxelSkrauba/BlackBox2C/actions)
 
@@ -16,6 +16,7 @@ tests/
 ├── test_cli.py                    # Command-line interface (19 tests)
 ├── test_codegen.py                # C code generation (25 tests)
 ├── test_config.py                 # ConversionConfig validation (9 tests)
+├── test_correctness_regressions.py  # Regression pruning, fidelity, immutability (20 tests)
 ├── test_conversion_warnings.py    # Fidelity / FLASH budget warnings (5 tests)
 ├── test_converter.py              # Converter end-to-end integration (14 tests)
 ├── test_exporters.py              # C++, Arduino, MicroPython exporters (40 tests)
@@ -40,11 +41,11 @@ tests/
 
 | Metric | Value |
 |---|---|
-| Total tests | **326** |
+| Total tests | **346** |
 | Status | 100% passing |
-| Coverage | **93%** (1734 statements, 126 missed) |
+| Coverage | **93%** (1778 statements, 131 missed) |
 | Runtime | ~24 s (full suite) |
-| Reference version | v0.2.3 |
+| Reference version | v0.2.4 |
 
 > Figures above were measured with `pytest --cov` on the reference version. Counts
 > drift as the suite grows — re-run `pytest --collect-only -q` to refresh them.
@@ -97,12 +98,12 @@ pytest tests/test_config.py::TestConversionConfig::test_default_config
 | `optimizer/extraction.py` | 100% | Rule extraction from sklearn trees |
 | `optimizer/ir.py` | 99% | Intermediate representation |
 | `codegen.py` | 96% | C code generation |
-| `optimizer/legacy.py` | 96% | Legacy pruning / merging |
+| `optimizer/legacy.py` | 92% | Legacy pruning / merging |
 | `optimizer/bdd.py` | 95% | BDD optimiser |
 | `optimizer/qm.py` | 94% | Quine-McCluskey optimiser |
 | `optimizer/routing.py` | 92% | Optimizer routing and auto-selection |
 | `surrogate.py` | 97% | Surrogate tree extraction |
-| `codegen_bridge.py` | 84% | RuleSet → hierarchical C bridge |
+| `codegen_bridge.py` | 85% | RuleSet → hierarchical C bridge |
 | `converter.py` | 90% | Main orchestration pipeline |
 | `cli.py` | 87% | Command-line interface |
 | `analysis.py` | 77% | Feature sensitivity analysis |
@@ -205,4 +206,4 @@ undefined) across codegen, exporters and extraction.
 
 ---
 
-**Last updated**: 2026-09-22 · **Reference version**: v0.2.3 · **Tests**: 326 · **Coverage**: 93%
+**Last updated**: 2026-11-26 · **Reference version**: v0.2.4 · **Tests**: 346 · **Coverage**: 93%

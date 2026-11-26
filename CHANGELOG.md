@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-26
+
+Correctness release: four defects that produced silently wrong output or
+unsafe generated code on the default configuration.
+
+### Changed
+
+- **Maturity classifier lowered to `Development Status :: 4 - Beta`.** The
+  package is published and tested, but the optimizer still carries known
+  scaling limits, so `Production/Stable` overstated its maturity.
+
 ### Fixed
 
 - **Regression trees keep their predictions through rule optimization.**
@@ -32,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metrics reported `0.762` while the exported tree scored `R^2 = -7.61`; the
   metric now matches the exported tree exactly. The low-fidelity warning is
   reported against that measured value, including for direct tree inputs.
+- **`blackbox2c --version` reports the packaged version.** The CLI printed a
+  hardcoded `0.2.0` since v0.1, two releases behind `__version__`.
 - **`feature_threshold` no longer emits out-of-bounds C.** Combining
   `feature_threshold` with a direct `DecisionTree*` input sliced `X_train` down
   to the selected columns but reused the fitted tree unchanged, so the emitted
@@ -368,7 +381,11 @@ Functional equivalence preserved at 100 % across every case.
 - Integration tests
 - Edge case tests
 
-[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.2.3
+[0.2.2]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.2.2
+[0.2.1]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.2.1
 [0.2.0]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AxelSkrauba/BlackBox2C/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AxelSkrauba/BlackBox2C/releases/tag/v0.1.0
